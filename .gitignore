@@ -1,0 +1,5 @@
+.vscode
+GNN/__pycache__
+GNN_movie
+GNN/log
+GNN/data
