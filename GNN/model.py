@@ -1,8 +1,8 @@
 from typing import Callable
 import torch
 import torch.nn as nn
-import numpy as np
 from torch import Tensor
+import torch_geometric as pyg
     
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int) -> None:
@@ -78,15 +78,11 @@ class GNN(nn.Module):
 
     def build_model(self):
         self.layers = nn.ModuleList()
-        if self.num_layers == 1:
-            self.layers.append(GNN_layer(self.in_channels, self.out_channels))
-        else:
-            self.layers.append(GNN_layer(self.in_channels, self.hidden_channels))
-            for _ in range(self.num_layers - 2):
-                self.layers.append(self.act)
-                self.layers.append(GNN_layer(self.hidden_channels, self.hidden_channels))
+        self.layers.append(GNN_layer(self.in_channels, self.hidden_channels))
+        for _ in range(self.num_layers - 1):
             self.layers.append(self.act)
-            self.layers.append(GNN_layer(self.hidden_channels, self.out_channels))
+            self.layers.append(GNN_layer(self.hidden_channels, self.hidden_channels))
+        self.layers.append(pyg.nn.models.MLP([self.hidden_channels, self.hidden_channels, self.out_channels]))
 
     def forward(self, A: Tensor, X: Tensor) -> Tensor:
         """
