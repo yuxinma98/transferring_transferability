@@ -82,7 +82,7 @@ class GNNTrainingModule(pl.LightningModule):
             "frequency": 1,
             "interval": "epoch",
         }
-        return [optimizer], [scheduler]
+        return [optimizer]#, [scheduler]
 
     def training_step(self, batch: pyg.data.Data, batch_idx) -> torch.Tensor:
         loss, metric = self._compute_loss_and_metrics(batch, mode="train")
