@@ -97,8 +97,13 @@ class GNNTrainingModule(pl.LightningModule):
                        f"val_{self.metric_name}": metric},
                        batch_size=len(batch))
 
+    def on_test_start(self):
+        super().on_test_start()
+        self.test_metric = {}
+    
     def test_step(self, batch: pyg.data.Data, batch_idx, dataloader_idx=0) -> None:
         loss, metric = self._compute_loss_and_metrics(batch, mode="test")
+        self.test_metric[dataloader_idx] = metric
         dataset_names = {
             0: "subgraph",
             1: "full"
@@ -106,6 +111,11 @@ class GNNTrainingModule(pl.LightningModule):
         self.log_dict({f"test_loss_{dataset_names[dataloader_idx]}": loss,
                        f"test_{self.metric_name}_{dataset_names[dataloader_idx]}": metric},
                         batch_size=len(batch)) 
+
+    def on_test_end(self):
+        super().on_test_end()
+        transferability = (self.test_metric[1] - self.test_metric[0])/self.test_metric[0]
+        self.log("transferability", transferability)
 
     def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
         try:
