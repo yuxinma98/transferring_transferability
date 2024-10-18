@@ -82,7 +82,7 @@ class GNN(nn.Module):
         for _ in range(self.num_layers - 1):
             self.layers.append(self.act)
             self.layers.append(GNN_layer(self.hidden_channels, self.hidden_channels))
-        self.layers.append(pyg.nn.models.MLP([self.hidden_channels, self.hidden_channels, self.out_channels]))
+        self.layers.append(pyg.nn.models.MLP([self.hidden_channels, self.hidden_channels, self.out_channels], norm=None))
 
     def forward(self, A: Tensor, X: Tensor) -> Tensor:
         """
