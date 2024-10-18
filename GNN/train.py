@@ -115,7 +115,7 @@ class GNNTrainingModule(pl.LightningModule):
     def on_test_end(self):
         super().on_test_end()
         transferability = (self.test_metric[1] - self.test_metric[0])/self.test_metric[0]
-        self.log("transferability", transferability)
+        self.logger.experiment.log_metrics("transferability", transferability)
 
     def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
         try:
