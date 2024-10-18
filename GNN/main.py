@@ -39,8 +39,9 @@ if __name__ == "__main__":
     parser.add_argument("--sample_fraction", type=float, default=0.1)
     parser.add_argument("--num_layers", type=int, default=1)
     parser.add_argument("--hidden_channels", type=int, default=50)
-    parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--num_trials", type=int, default=5)
+    parser.add_argument("--max_epochs", type=int, default=300)
 
     args = parser.parse_args()
     params = {
@@ -66,7 +67,7 @@ if __name__ == "__main__":
         "lr": args.lr,
         "lr_patience": 10,
         "weight_decay": 0.1,
-        "max_epochs": 150,
+        "max_epochs": args.max_epochs,
         "training_seed":42,
     }
     for i in range(args.num_trials):
