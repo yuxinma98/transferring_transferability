@@ -1,10 +1,8 @@
-import torch
 import wandb
 import argparse
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import model_checkpoint
 from pytorch_lightning.loggers import WandbLogger
-import torch_geometric as pyg
 
 from train import GNNTrainingModule
 
@@ -42,6 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_layers", type=int, default=1)
     parser.add_argument("--hidden_channels", type=int, default=50)
     parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--num_trials", type=int, default=5)
 
     args = parser.parse_args()
     params = {
@@ -70,5 +69,6 @@ if __name__ == "__main__":
         "max_epochs": 150,
         "training_seed":42,
     }
-
-    train(params)
+    for i in range(args.num_trials):
+        params["training_seed"] = i
+        train(params)
