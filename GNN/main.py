@@ -11,12 +11,6 @@ from train import GNNTrainingModule
 def train(params):
     # fix seed
     pl.seed_everything(params["training_seed"])
-    # torch.manual_seed(params["training_seed"])
-    # if torch.cuda.is_available():
-    #     torch.cuda.manual_seed(params["training_seed"])
-    #     torch.cuda.manual_seed_all(params["training_seed"])
-    # torch.backends.cudnn.deterministic = True
-    # torch.backends.cudnn.benchmark = False
     model = GNNTrainingModule(params)
     model_checkpoint = ModelCheckpoint(
         filename="{epoch}-{step}-{val_loss:.2f}",
@@ -47,15 +41,14 @@ if __name__ == "__main__":
     parser.add_argument("--sample_fraction", type=float, default=0.1)
     parser.add_argument("--num_layers", type=int, default=1)
     parser.add_argument("--hidden_channels", type=int, default=50)
-    parser.add_argument("--lr", type=float, default=5e-3)
-    parser.add_argument("--logger", type=bool, default=True)
+    parser.add_argument("--lr", type=float, default=5e-5)
 
     args = parser.parse_args()
     params = {
         #logger parameters
         "project": "anydim_transferability",
         "name": "GNN",
-        "logger": args.logger,
+        "logger": True,
         "log_checkpoint": False,
         "log_model": None,
         "log_dir": "log/",

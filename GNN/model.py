@@ -3,20 +3,22 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch import Tensor
-
+    
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
         self.in_channels = in_channels #D1
         self.out_channels = out_channels #D2
 
-        self.A_num_params = 5 + 2 * in_channels
-        self.X_num_params = 4 + 2 * in_channels
-
         # Initialize parameters
-        self.A_coeffs = nn.Parameter(torch.randn(self.A_num_params), requires_grad = True)
-        self.X_coeffs_1 = nn.Parameter(torch.randn(self.out_channels, self.X_num_params) * np.sqrt(2.0) / (self.out_channels + self.X_num_params), requires_grad = True)
-        self.X_coeffs_2 = nn.Parameter(torch.randn(self.out_channels, self.X_num_params) * np.sqrt(2.0) / (self.out_channels + self.X_num_params), requires_grad = True)
+        self.A_coeffs = nn.Parameter(torch.randn(5), requires_grad = True)
+        self.A_l1, self.A_l2 = nn.ModuleList([nn.Linear(in_channels, 1, bias=False) for _ in range(2)])
+
+        self.X1_l1, self.X1_l2 = nn.ModuleList([nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)])
+        self.X1_l3, self.X1_l4, self.X1_l5, self.X1_l6 = nn.ModuleList([nn.Linear(1, out_channels, bias=False) for _ in range(4)])
+        self.X2_l1, self.X2_l2 = nn.ModuleList([nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)])
+        self.X2_l3, self.X2_l4, self.X2_l5, self.X2_l6 = nn.ModuleList([nn.Linear(1, out_channels, bias=False) for _ in range(4)])
+        
 
     def forward(self, A: Tensor, X: Tensor) -> Tensor:
         """
@@ -28,37 +30,36 @@ class GNN_layer(nn.Module):
             Tensor: output signal, shape N x n x D2
         """
         n = A.shape[-1]  # extract dimension
-        # Compute basis
         A = A.unsqueeze(dim=1) # N x 1 x n x n
-        X = X.transpose(-2, -1) # N x D1 x n
         diag_part = torch.diagonal(A, dim1=-2, dim2=-1)   # N x 1 x n
         mean_diag_part = torch.mean(diag_part, dim=-1).unsqueeze(dim=-1)  # N x 1 x 1
         mean_of_cols = torch.mean(A, dim=-1)  # N x 1 x n
         mean_all = torch.mean(mean_of_cols, dim=-1).unsqueeze(dim=-1)  # N x 1 x 1
-        mean_X = torch.mean(X, dim=-1).unsqueeze(dim=-1) #N x D1 x 1
-        a1 = A
-        a2 = mean_all.unsqueeze(dim=-1).expand(-1, -1, n, n)
-        a3 = mean_diag_part.unsqueeze(dim=-1).expand(-1, -1, n, n)
-        a4 = mean_of_cols.unsqueeze(dim=-1).expand(-1, -1, n, n) + mean_of_cols.unsqueeze(dim=-2).expand(-1, -1, n, n)
-        a5 = diag_part.unsqueeze(dim=-1).expand(-1, -1, n, n) + diag_part.unsqueeze(dim=-2).expand(-1, -1, n, n)
-        a6 = X.unsqueeze(dim=-1).expand(-1, -1, n, n) + X.unsqueeze(dim=-2).expand(-1, -1, n, n) # N x D1 x n x n
-        a7 = mean_X.unsqueeze(dim=-1).expand(-1, -1, n, n) # N x D1 x n x n
-        x1 = X # N x D1 x n
-        x2 = mean_X.expand(-1, -1, n) # N x D1 x n
-        x3 = mean_of_cols # N x 1 x n
-        x4 = diag_part # N x 1 x n
-        x5 = mean_diag_part.expand(-1, -1, n) # N x 1 x n
-        x6 = mean_all.expand(-1, -1, n) # N x 1 x n
+        mean_X = torch.mean(X, dim=-2).unsqueeze(dim=-2) #N x 1 x D1
 
-        # Multiply learnable coefficients
-        out_a = torch.concat([a1, a2, a3, a4, a5, a6, a7], dim=1) # N x (5 + 2*D1) x n x n 
-        A_transformed = torch.einsum('d,ndij->nij', self.A_coeffs, out_a) # N x n x n
-        out_x = torch.concat([x1, x2, x3, x4, x5, x6], dim=1) # N x (4 + 2*D1) x n
-        X_transformed_1 = torch.einsum('bd,ndi->nbi', self.X_coeffs_1, out_x) # N x D2 x n
-        X_transformed_2 = torch.einsum('bd,ndi->nbi', self.X_coeffs_2, out_x) # N x D2 x n
-        
-        out = A_transformed.matmul(X_transformed_1.transpose(-1,-2)).transpose(-1,-2) / n + X_transformed_2 # N x D2 x n
-        out = out.transpose(-2, -1) # N x n x D2
+        A_transform = self.A_coeffs[0] * A.squeeze(dim=1)
+        A_transform += self.A_coeffs[1] * mean_all 
+        A_transform += self.A_coeffs[2] * mean_diag_part
+        A_transform += self.A_coeffs[3] * (mean_of_cols + mean_of_cols.transpose(-1,-2))
+        A_transform += self.A_coeffs[4] * (diag_part + diag_part.transpose(-1,-2))
+        A_transform += (self.A_l1(X.unsqueeze(dim=-2)) + self.A_l1(X.unsqueeze(dim=-3))).squeeze(dim=-1)
+        A_transform += self.A_l2(mean_X).expand(-1,n,n)
+
+        X1_transform = self.X1_l1(X)
+        X1_transform += self.X1_l2(mean_X)
+        X1_transform += self.X1_l3(mean_of_cols.squeeze(dim=-2).unsqueeze(dim=-1))
+        X1_transform += self.X1_l4(diag_part.squeeze(dim=-2).unsqueeze(dim=-1))
+        X1_transform += self.X1_l5(mean_diag_part)
+        X1_transform += self.X1_l6(mean_all)
+
+        X2_transform = self.X2_l1(X)
+        X2_transform += self.X2_l2(mean_X)
+        X2_transform += self.X2_l3(mean_of_cols.squeeze(dim=-2).unsqueeze(dim=-1))
+        X2_transform += self.X2_l4(diag_part.squeeze(dim=-2).unsqueeze(dim=-1))
+        X2_transform += self.X2_l5(mean_diag_part)
+        X2_transform += self.X2_l6(mean_all)
+
+        out = A_transform.matmul(X2_transform) / n + X1_transform
         return out
 
 class GNN(nn.Module):
