@@ -24,7 +24,7 @@ class GNNTrainingModule(pl.LightningModule):
             self.metric_name = "mse"
 
     def prepare_data(self):
-        dataset = planetoid.Planetoid(root="data/", name="Cora", split="public")
+        dataset = planetoid.Planetoid(root="data/", name="Cora", split="public", transform=pyg.transforms.NormalizeFeatures())
         data = dataset[0]
         data.A = pyg.utils.to_dense_adj(data.edge_index).squeeze(dim=0)
         self.data = data
