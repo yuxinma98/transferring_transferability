@@ -71,5 +71,5 @@ if __name__ == "__main__":
         "training_seed":42,
     }
     for i in range(args.num_trials):
-        params["training_seed"] = i
+        params["data_seed"] = i
         train(params)
