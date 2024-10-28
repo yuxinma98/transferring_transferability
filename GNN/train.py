@@ -31,7 +31,7 @@ class GNNTrainingModule(pl.LightningModule):
 
         num_nodes = data.num_nodes
         sample_size = int(num_nodes * self.params["sample_fraction"])  # 1/10 of the nodes
-        sampled_nodes = torch.randperm(num_nodes)[:sample_size]
+        sampled_nodes = torch.randperm(num_nodes, generator=torch.Generator().manual_seed(self.params["data_seed"]))[:sample_size]
         subgraph_edge_index, subgraph_edge_attr = pyg.utils.subgraph(sampled_nodes, data.edge_index, data.edge_attr)
         subgraph_data = data.clone()
         subgraph_data.edge_index = subgraph_edge_index
@@ -82,7 +82,7 @@ class GNNTrainingModule(pl.LightningModule):
             "frequency": 1,
             "interval": "epoch",
         }
-        return [optimizer]#, [scheduler]
+        return [optimizer], [scheduler]
 
     def training_step(self, batch: pyg.data.Data, batch_idx) -> torch.Tensor:
         loss, metric = self._compute_loss_and_metrics(batch, mode="train")
