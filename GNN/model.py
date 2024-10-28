@@ -5,10 +5,11 @@ from torch import Tensor
 import torch_geometric as pyg
     
 class GNN_layer(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int) -> None:
+    def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
         super().__init__()
         self.in_channels = in_channels #D1
         self.out_channels = out_channels #D2
+        self.reduced = reduced
 
         # Initialize parameters
         self.A_coeffs = nn.Parameter(torch.randn(5), requires_grad = True)
@@ -39,25 +40,28 @@ class GNN_layer(nn.Module):
 
         A_transform = self.A_coeffs[0] * A.squeeze(dim=1)
         A_transform += self.A_coeffs[1] * mean_all 
-        A_transform += self.A_coeffs[2] * mean_diag_part
         A_transform += self.A_coeffs[3] * (mean_of_cols + mean_of_cols.transpose(-1,-2))
-        A_transform += self.A_coeffs[4] * (diag_part + diag_part.transpose(-1,-2))
         A_transform += (self.A_l1(X.unsqueeze(dim=-2)) + self.A_l1(X.unsqueeze(dim=-3))).squeeze(dim=-1)
         A_transform += self.A_l2(mean_X).expand(-1,n,n)
+        if not self.reduced:
+            A_transform += self.A_coeffs[2] * mean_diag_part
+            A_transform += self.A_coeffs[4] * (diag_part + diag_part.transpose(-1,-2))
 
         X1_transform = self.X1_l1(X)
         X1_transform += self.X1_l2(mean_X)
         X1_transform += self.X1_l3(mean_of_cols.squeeze(dim=-2).unsqueeze(dim=-1))
-        X1_transform += self.X1_l4(diag_part.squeeze(dim=-2).unsqueeze(dim=-1))
-        X1_transform += self.X1_l5(mean_diag_part)
         X1_transform += self.X1_l6(mean_all)
+        if not self.reduced:
+            X1_transform += self.X1_l4(diag_part.squeeze(dim=-2).unsqueeze(dim=-1))
+            X1_transform += self.X1_l5(mean_diag_part)
 
         X2_transform = self.X2_l1(X)
         X2_transform += self.X2_l2(mean_X)
         X2_transform += self.X2_l3(mean_of_cols.squeeze(dim=-2).unsqueeze(dim=-1))
-        X2_transform += self.X2_l4(diag_part.squeeze(dim=-2).unsqueeze(dim=-1))
-        X2_transform += self.X2_l5(mean_diag_part)
         X2_transform += self.X2_l6(mean_all)
+        if not self.reduced:
+            X2_transform += self.X2_l4(diag_part.squeeze(dim=-2).unsqueeze(dim=-1))
+            X2_transform += self.X2_l5(mean_diag_part)
 
         out = A_transform.matmul(X2_transform) / n + X1_transform
         return out
@@ -78,11 +82,15 @@ class GNN(nn.Module):
 
     def build_model(self):
         self.layers = nn.ModuleList()
-        self.layers.append(GNN_layer(self.in_channels, self.hidden_channels))
-        for _ in range(self.num_layers - 1):
+        if self.num_layers == 1:
+            self.layers.append(GNN_layer(self.in_channels, self.out_channels))
+        else:
+            self.layers.append(GNN_layer(self.in_channels, self.hidden_channels))
+            for _ in range(self.num_layers - 2):
+                self.layers.append(self.act)
+                self.layers.append(GNN_layer(self.hidden_channels, self.hidden_channels))
             self.layers.append(self.act)
-            self.layers.append(GNN_layer(self.hidden_channels, self.hidden_channels))
-        self.layers.append(pyg.nn.models.MLP([self.hidden_channels, self.hidden_channels, self.out_channels], norm=None))
+            self.layers.append(GNN_layer(self.hidden_channels, self.out_channels))
 
     def forward(self, A: Tensor, X: Tensor) -> Tensor:
         """
