@@ -16,12 +16,13 @@ from torch.autograd import Variable
 
 import tensorflow as tf
 
-from DeepSet.loader import DataIterator
-from DeepSet.generator.model import DeepSet
+from loader import DataIterator
+from model import DeepSet
 
 def log_scalar(writer, tag, value, step):
-    summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
-    writer.add_summary(summary, step)
+    with writer.as_default():
+        tf.summary.scalar(name=tag, data=value, step=step)
+        writer.flush()
 
     
 class Trainer(object):
@@ -47,7 +48,7 @@ class Trainer(object):
         best_mse = 1.0e6
         loss_val = 0.0
 
-        train_writer = tf.summary.FileWriter(self.log_dir)
+        train_writer = tf.summary.create_file_writer(self.log_dir)
 
         for j in trange(self.num_epochs, desc="Epochs: ", ncols=80):
             train_iterator = train.get_iterator(train_loss)
@@ -56,7 +57,7 @@ class Trainer(object):
                 self.optim.zero_grad()
                 y_pred = self.model(Variable(torch.from_numpy(X)).cuda())
                 loss = self.l2(y_pred, Variable(torch.from_numpy(y).cuda()))
-                loss_val = np.asscalar(loss.data.cpu().numpy())
+                loss_val = loss.data.cpu().numpy().item()
                 train_loss = 0.9*train_loss + 0.1*loss_val
                 loss.backward()
                 self.optim.step()
@@ -91,7 +92,7 @@ class Trainer(object):
                 self.optim.zero_grad()
                 y_pred = self.model(Variable(torch.from_numpy(X)).cuda())
                 loss = self.l1(y_pred, Variable(torch.from_numpy(y).cuda()))
-                loss_val = np.asscalar(loss.data.cpu().numpy())
+                loss_val = loss.data.cpu().numpy().item()
                 train_loss = 0.9*train_loss + 0.1*loss_val
                 loss.backward()
                 self.optim.step()
@@ -129,7 +130,7 @@ class Trainer(object):
             y_pred = self.model(Variable(torch.from_numpy(X)).cuda())
             sum_mae += self.l1(y_pred, Variable(torch.from_numpy(y)).cuda()).data.cpu().numpy()
             sum_mse += self.l2(y_pred, Variable(torch.from_numpy(y)).cuda()).data.cpu().numpy()
-        return np.asscalar(sum_mae/counts), np.asscalar(sum_mse/counts)
+        return np.squeeze(sum_mae/counts).item(), np.squeeze(sum_mse/counts).item()
         
     def predict(self, test):
         y_preds = []
@@ -184,10 +185,10 @@ if __name__ == '__main__':
     with h5py.File(ddir+'truth.mat') as f:
         t = np.squeeze(f['X_parameter'][()])
         y = np.squeeze(f['Y'][()])
-    print 'Loaded dataset'
+    print('Loaded dataset')
     
     nb_epoch = 500 # np.max([1024*1024/train.L,100])
-    print train.d
+    print(train.d)
     t = Trainer(train.d, (t,y), nb_epoch, odir, odir+'logs/')
     a, b = t.fit(train, valid)
     t.model = torch.load(odir + 'best_mse_model.pth')

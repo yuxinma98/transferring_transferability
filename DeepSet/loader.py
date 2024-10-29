@@ -13,8 +13,8 @@ class DataIterator(object):
         # Load data from Matlab
         with h5py.File(fname) as f:
             #pdb.set_trace()
-            self.L = np.asscalar(f['L'][()].astype('int32'))
-            self.N = np.asscalar(f['N'][()].astype('int32'))
+            self.L = f['L'][()].astype('int32').item()
+            self.N = f['N'][()].astype('int32').item()
             self.t = np.squeeze(f['X_parameter'][()])
             self.X = f['X'][()]
             self.d = self.X.shape[0]

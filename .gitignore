@@ -4,3 +4,4 @@ GNN_movie
 GNN/log
 GNN/data
 DeepSet/generator/data
+DeepSet/__pycache__
