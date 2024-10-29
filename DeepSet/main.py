@@ -56,7 +56,6 @@ def train(params):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_id", type=int, choices=[1,2,3,4])
-    parser.add_argument("--exp_id", type=int, choices=list(range(7,18)))
     parser.add_argument("--normalized", type=str2bool, default=True)
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--hidden_channels", type=int, default=50)
@@ -78,7 +77,6 @@ if __name__ == '__main__':
         # data parameters
         "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
         "task_id": args.task_id,
-        "exp_id": args.exp_id,
         "batch_size": 128,
         # model parameters
         "model":{

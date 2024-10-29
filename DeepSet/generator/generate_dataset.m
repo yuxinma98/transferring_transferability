@@ -8,23 +8,26 @@ function [] = generate_dataset()
         disp(task);
         disp(out_directory);
 
-        L=512; %Number of sets in validation/test
-        N=512; %Number of points per set
+        L = 2^10; %Number of sets
+        N = 500; %Number of points per set
 
+        %Generate train dataset
+        save_dataset(L, N, [out_directory,'train.mat'], generator)
+
+        L=512; %Number of sets for test and validation
         %Generate test dataset
         save_dataset(L, N, [out_directory,'test.mat'], generator)
-
         %Generate validation dataset
         save_dataset(L, N, [out_directory,'val.mat'], generator)
 
         %Generate truth for plotting
         save_dataset(2^14, 1, [out_directory,'truth.mat'], generator)
 
-        %create dataset of different size:
-        for logL = 7:17 %number of train distributions
-            L = 2^logL;
-            disp(L);
-            save_dataset(L, N, [out_directory, 'data_', int2str(logL), '.mat'], generator)
+        %additional test set with different number of points per sets
+        L = 512;
+        for N = 1000:500:5000 %number of train distributions
+            disp(N);
+            save_dataset(L, N, [out_directory, 'data_', int2str(N), '.mat'], generator)
         end
         display(['Data generated for task' num2str(i)])
     end
