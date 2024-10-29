@@ -5,3 +5,5 @@ GNN/log
 GNN/data
 DeepSet/generator/data
 DeepSet/__pycache__
+DeepSet/log
+lightning_logs

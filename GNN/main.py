@@ -7,7 +7,6 @@ from pytorch_lightning.loggers import WandbLogger
 from train import GNNTrainingModule
 
 def train(params):
-    # fix seed
     pl.seed_everything(params["training_seed"])
     model = GNNTrainingModule(params)
     model_checkpoint = ModelCheckpoint(
