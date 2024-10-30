@@ -7,3 +7,4 @@ DeepSet/generator/data
 DeepSet/__pycache__
 DeepSet/log
 lightning_logs
+DeepSet/generator/data_old
