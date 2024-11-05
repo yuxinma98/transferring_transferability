@@ -35,19 +35,20 @@ class PopStatsDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 class PopStatsDataModule(LightningDataModule):
-    def __init__(self, data_dir: Union[str, os.PathLike], task_id: int, batch_size: int, **kwargs) -> None:
+    def __init__(self, data_dir: Union[str, os.PathLike], task_id: int, batch_size: int, training_size: int, **kwargs) -> None:
         super().__init__()
         self.data_dir = data_dir
         self.task_id = task_id
         self.batch_size = batch_size
+        self.size = training_size
 
     def prepare_data(self):
         pass
 
     def setup(self, stage=None):
-        self.train_dataset = PopStatsDataset(os.path.join(self.data_dir, f'task{self.task_id}/train.mat'))
-        self.val_dataset = PopStatsDataset(os.path.join(self.data_dir, f'task{self.task_id}/val.mat'))
-        self.test_dataset = PopStatsDataset(os.path.join(self.data_dir, f'task{self.task_id}/test.mat'))
+        self.train_dataset = PopStatsDataset(os.path.join(self.data_dir, f'task{self.task_id}/train_{self.size}.mat'))
+        self.val_dataset = PopStatsDataset(os.path.join(self.data_dir, f'task{self.task_id}/val_{self.size}.mat'))
+        self.test_dataset = PopStatsDataset(os.path.join(self.data_dir, f'task{self.task_id}/test_{self.size}.mat'))
         self.truth = PopStatsDataset(os.path.join(self.data_dir, f'task{self.task_id}/truth.mat'))
         self.d = self.train_dataset.d
 

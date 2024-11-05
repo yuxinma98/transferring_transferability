@@ -97,7 +97,8 @@ def train(params):
     pl.seed_everything(params["training_seed"])
     data = PopStatsDataModule(data_dir=params["data_dir"],
                               task_id = params["task_id"],
-                              batch_size = params["batch_size"])
+                              batch_size = params["batch_size"],
+                              training_size = params["training_size"])
     data.setup()
     params["model"]["in_channels"] = data.d
     model = DeepSetTrainingModule(params)

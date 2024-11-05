@@ -27,7 +27,7 @@ def eval(model, params):
     mse = MeanSquaredError()
     test_mse = []
     for N in np.arange(1000,5000,500):
-        dataset = PopStatsDataset(fname = os.path.join(params["data_dir"], f'task{params["task_id"]}/data_{N}.mat'))
+        dataset = PopStatsDataset(fname = os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat'))
         y_pred = model.predict(dataset.X)
         test_mse.append(mse(y_pred, dataset.y))
     return test_mse
@@ -35,6 +35,7 @@ def eval(model, params):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument("--training_size", type=int, default=500)
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--hidden_channels", type=int, default=50)
     parser.add_argument("--set_channels", type=int, default=50)
@@ -53,6 +54,7 @@ if __name__ == '__main__':
         "log_dir": os.path.join(CURRENT_DIR, "log/"),
         # data parameters
         "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
+        "training_size": args.training_size,
         "batch_size": 128,
         # model parameters
         "model":{
