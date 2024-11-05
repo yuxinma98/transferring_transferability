@@ -3,9 +3,13 @@ import torch.nn as nn
 import pytorch_lightning as pl
 import matplotlib
 import os
+import wandb
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from model import DeepSet
+from data import PopStatsDataModule
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
 
 class DeepSetTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:
@@ -88,3 +92,36 @@ class DeepSetTrainingModule(pl.LightningModule):
     def predict(self, X):
         with torch.no_grad():
             return self.model(X.to(self.device))
+
+def train(params):
+    pl.seed_everything(params["training_seed"])
+    data = PopStatsDataModule(data_dir=params["data_dir"],
+                              task_id = params["task_id"],
+                              batch_size = params["batch_size"])
+    data.setup()
+    params["model"]["in_channels"] = data.d
+    model = DeepSetTrainingModule(params)
+    model_checkpoint = ModelCheckpoint(
+        filename="{epoch}-{step}-{val_loss:.2f}",
+        save_last=True,
+        mode="min",
+        monitor="val_mse",
+    )
+    if params["logger"]:
+        logger = WandbLogger(
+            project=params["project"], name=params["name"], log_model=params["log_checkpoint"], save_dir=params["log_dir"]
+        )
+        logger.watch(model, log = params["log_model"], log_freq=50)
+    trainer = pl.Trainer(
+        callbacks=[model_checkpoint],
+        devices=1,
+        max_epochs=params["max_epochs"],
+        logger=logger if params["logger"] else None,
+        enable_progress_bar=True,
+    )
+    trainer.fit(model,datamodule=data)
+    if params["logger"]:
+        logger.experiment.unwatch(model)
+    trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
+    wandb.finish()
+    return model
