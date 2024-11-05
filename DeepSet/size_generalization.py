@@ -53,7 +53,6 @@ if __name__ == '__main__':
         "log_dir": os.path.join(CURRENT_DIR, "log/"),
         # data parameters
         "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
-        "task_id": args.task_id,
         "batch_size": 128,
         # model parameters
         "model":{
