@@ -4,30 +4,41 @@ function [] = generate_dataset()
     for i = 1:4
         task = ['generate_task', num2str(i), '_dataset'];
         generator = str2func(task);
-        out_directory = ['data/task', num2str(i), '/'] %['./data/task', num2str(i), '/']; % 
+        out_directory = ['data/task', num2str(i), '/']; %['./data/task', num2str(i), '/']; % 
         disp(task);
         disp(out_directory);
 
-        L = 2^10; %Number of sets
-        N = 500; %Number of points per set
-
         %Generate train dataset
-        save_dataset(L, N, [out_directory,'train.mat'], generator)
+        for N = 500:500:3000 %number of points per set
+            disp(N);
+            train_file = [out_directory, 'train_', int2str(N), '.mat'];
+            val_file = [out_directory, 'val_', int2str(N), '.mat'];
+            test_file = [out_directory, 'test_', int2str(N), '.mat'];
 
-        L=512; %Number of sets for test and validation
-        %Generate test dataset
-        save_dataset(L, N, [out_directory,'test.mat'], generator)
-        %Generate validation dataset
-        save_dataset(L, N, [out_directory,'val.mat'], generator)
+            if ~isfile(train_file)
+                save_dataset(2^10, N, train_file, generator)
+            end
+            if ~isfile(val_file)
+                save_dataset(512, N, val_file, generator)
+            end
+            if ~isfile(test_file)
+                save_dataset(512, N, test_file, generator)
+            end
+        end
 
         %Generate truth for plotting
-        save_dataset(2^14, 1, [out_directory,'truth.mat'], generator)
+        truth_file = [out_directory, 'truth.mat'];
+        if ~isfile(truth_file)
+            save_dataset(2^14, 1, truth_file, generator)
+        end
 
         %additional test set with different number of points per sets
-        L = 512;
-        for N = 1000:500:5000 %number of train distributions
+        for N = 3000:500:5000 %number of train distributions
             disp(N);
-            save_dataset(L, N, [out_directory, 'data_', int2str(N), '.mat'], generator)
+            test_file = [out_directory, 'test_', int2str(N), '.mat'];
+            if ~isfile(test_file)
+                save_dataset(512, N, test_file, generator)
+            end
         end
         display(['Data generated for task' num2str(i)])
     end
