@@ -48,7 +48,7 @@ if __name__ == '__main__':
     params = {
         #logger parameters
         "project": "anydim_transferability",
-        "name": "DeepSet",
+        "name": "deepset_size_generalization",
         "logger": True,
         "log_checkpoint": False,
         "log_model": None,
