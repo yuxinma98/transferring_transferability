@@ -27,7 +27,7 @@ def eval(model, params):
     for N in np.arange(1000,5000,500):
         dataset = PopStatsDataset(fname = os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat'))
         y_pred = model.predict(dataset.X)
-        test_mse.append(mse(y_pred, dataset.y))
+        test_mse.append(float(mse(y_pred, dataset.y)))
     return test_mse
 
 
@@ -95,13 +95,15 @@ if __name__ == '__main__':
                 params["model"]["normalized"] = True
                 params["training_seed"] = seed
                 model_normalized = train(params)
-                mse_normalized = eval(model_normalized, params)[-1]
-                results[str(task_id)]["normalized"][str(seed)] = float(mse_normalized)
+                mse_normalized = eval(model_normalized, params)
+                results[str(task_id)]["normalized"][str(seed)] = mse_normalized
             if str(seed) not in results[str(task_id)]["unnormalized"]:
                 params["model"]["normalized"] = False
                 model_unnormalized = train(params)
-                mse_unnormalized = eval(model_unnormalized, params)[-1]
-                results[str(task_id)]["unnormalized"][str(seed)] = float(mse_unnormalized)
+                mse_unnormalized = eval(model_unnormalized, params)
+                results[str(task_id)]["unnormalized"][
+                    str(seed)
+                ] = mse_unnormalized
             with open(os.path.join(params["log_dir"], 'size_generalization/results.json'), 'w') as f:
                 json.dump(results, f)
 
@@ -133,6 +135,5 @@ if __name__ == '__main__':
         plt.ylabel('Test MSE')
         plt.title(f'Task {params["task_id"]}')
         plt.legend()
-        plt.xscale('log')
         plt.yscale('log')
         plt.savefig(os.path.join(params["log_dir"], f'size_generalization/task{params["task_id"]}_plot.png'))
