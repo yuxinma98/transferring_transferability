@@ -108,7 +108,9 @@ def train(params, stopping_threshold=False):
         mode="min",
         monitor="val_mse",
     )
-    early_stopping = pl.callbacks.EarlyStopping(monitor="val_mse", stopping_threshold=1e-4)
+    early_stopping = pl.callbacks.EarlyStopping(
+        monitor="val_mse", patience=params["max_epochs"], stopping_threshold=1e-4
+    )
     if params["logger"]:
         logger = WandbLogger(
             project=params["project"], name=params["name"], log_model=params["log_checkpoint"], save_dir=params["log_dir"]
