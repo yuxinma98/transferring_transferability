@@ -52,6 +52,7 @@ if __name__ == '__main__':
         # data parameters
         "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
         "batch_size": 128,
+        "testing_size": args.testing_size,
         # model parameters
         "model": {
             "hidden_channels": args.hidden_channels,
