@@ -1,7 +1,6 @@
 import os
 import argparse
-import pytorch_lightning as pl
-
+import json
 from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,8 +18,6 @@ def str2bool(value):
         return False
     else:
         raise argparse.ArgumentTypeError("Boolean value expected.")
-    
-
 
 def eval(model, params):
     model.eval()
@@ -77,23 +74,36 @@ if __name__ == '__main__':
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
     
+    # load results
+    try:
+        with open(os.path.join(params["log_dir"], 'size_generalization/results.json'), 'r') as f:
+            results = json.load(f)
+    except:
+        results = {}
+
     for task_id in [1,2,3,4]:
         params["task_id"] = task_id
+        results.setdefault(str(task_id),{})
         
-        mse_normalized_list = []
-        mse_unnormalized_list = []
-        for trial in range(args.num_trials):
-            params["model"]["normalized"] = True
-            params["training_seed"] = trial + 1
-            model_normalized = train(params)
-            mse_normalized = eval(model_normalized, params)
-            mse_normalized_list.append(mse_normalized[-1])
+        # run experiments
+        for seed in range(args.num_trials): # run multiple trials
+            if str(seed) not in results[str(task_id)]["normalized"]: # skip if already done
+                params["model"]["normalized"] = True
+                params["training_seed"] = seed
+                model_normalized = train(params)
+                mse_normalized = eval(model_normalized, params)[-1]
+                results[str(task_id)]["normalized"][str(seed)] = mse_normalized
+            if str(seed) not in results[str(task_id)]["unnormalized"]:
+                params["model"]["normalized"] = False
+                model_unnormalized = train(params)
+                mse_unnormalized = eval(model_unnormalized, params)[-1]
+                results[str(task_id)]["unnormalized"][str(seed)]=mse_unnormalized
+            with open(os.path.join(params["log_dir"], 'size_generalization/results.json'), 'w') as f:
+                json.dump(results, f)
 
-            params["model"]["normalized"] = False
-            model_unnormalized = train(params)
-            mse_unnormalized = eval(model_unnormalized, params)
-            mse_unnormalized_list.append(mse_unnormalized[-1])
-
+        # plot results
+        mse_normalized_list = [results[str(task_id)]["normalized"][str(seed)] for seed in range(args.num_trials)]
+        mse_unnormalized_list = [results[str(task_id)]["unnormalized"][str(seed)] for seed in range(args.num_trials)]
         mean_mse_normalized = np.mean(mse_normalized_list, axis=0)
         mean_mse_unnormalized = np.mean(mse_unnormalized_list, axis=0)
         min_mse_normalized = np.min(mse_normalized_list, axis=0)
