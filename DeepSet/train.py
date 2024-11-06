@@ -22,7 +22,7 @@ class DeepSetTrainingModule(pl.LightningModule):
 
     def forward(self, x):
         return self.model(x)
-    
+
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             self.parameters(),
@@ -46,12 +46,12 @@ class DeepSetTrainingModule(pl.LightningModule):
         loss = self.l2(y_pred, y)
         self.log('train_loss', loss)
         return loss
-    
+
     def on_validation_start(self):
         super().on_validation_start()
         self.val_t = []
         self.val_y_preds = []
-    
+
     def validation_step(self, batch, batch_idx):
         X, y = batch
         y_pred = self.model(X)
@@ -59,7 +59,7 @@ class DeepSetTrainingModule(pl.LightningModule):
         mse = self.l2(y_pred, y)
         self.log('val_mae', mae)
         self.log('val_mse', mse)
-    
+
     def on_validation_end(self):
         super().on_validation_end()
         truth = self.trainer.datamodule.truth
@@ -79,7 +79,7 @@ class DeepSetTrainingModule(pl.LightningModule):
         plt.close()
         if self.params.get("logger", True):
             self.logger.log_image(key = "current_status", images = [os.path.join(self.params["log_dir"], "current_status.png")])
-    
+
     def test_step(self, batch, batch_idx):
         X, y = batch
         y_pred = self.model(X)
@@ -88,12 +88,12 @@ class DeepSetTrainingModule(pl.LightningModule):
         self.log('test_mae', mae)
         self.log('test_mse', mse)
 
-
     def predict(self, X):
         with torch.no_grad():
             return self.model(X.to(self.device))
 
-def train(params):
+
+def train(params, stopping_threshold=False):
     pl.seed_everything(params["training_seed"])
     data = PopStatsDataModule(data_dir=params["data_dir"],
                               task_id = params["task_id"],
@@ -108,13 +108,14 @@ def train(params):
         mode="min",
         monitor="val_mse",
     )
+    early_stopping = pl.callbacks.EarlyStopping(monitor="val_mse", stopping_threshold=1e-4)
     if params["logger"]:
         logger = WandbLogger(
             project=params["project"], name=params["name"], log_model=params["log_checkpoint"], save_dir=params["log_dir"]
         )
         logger.watch(model, log = params["log_model"], log_freq=50)
     trainer = pl.Trainer(
-        callbacks=[model_checkpoint],
+        callbacks=[model_checkpoint, early_stopping] if stopping_threshold else [model_checkpoint],
         devices=1,
         max_epochs=params["max_epochs"],
         logger=logger if params["logger"] else None,

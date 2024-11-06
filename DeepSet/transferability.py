@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument("--hidden_channels", type=int, default=50)
     parser.add_argument("--set_channels", type=int, default=50)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--max_epochs", type=int, default=1000)
+    parser.add_argument("--max_epochs", type=int, default=5000)
 
     args = parser.parse_args()
 
@@ -82,29 +82,19 @@ if __name__ == '__main__':
 
     for task_id in [1,2,3,4]:
         params["task_id"] = task_id
-        results.setdefault(str(task_id), {}).setdefault("normalized", {})
-        results[str(task_id)].setdefault("unnormalized", {})
+        results.setdefault(str(task_id), {})
 
         # run experiments
         for seed in range(args.num_trials):
-            if str(seed) not in results[str(task_id)]["normalized"]:
+            if str(seed) not in results[str(task_id)]:
                 params["model"]["normalized"] = True
                 mse_normalized = []
                 params["training_seed"] = seed
                 for training_size in range(500, 3000, 500):
                     params["training_size"] = training_size
-                    model_normalized = train(params)
+                    model_normalized = train(params, stopping_threshold=True)
                     mse_normalized.append(eval(model_normalized, params))
                 results[str(task_id)]["normalized"][str(seed)] = mse_normalized
-
-            if str(seed) not in results[str(task_id)]["unnormalized"]:
-                params["model"]["normalized"] = False
-                mse_unnormalized = []
-                for training_size in range(500, 3000, 500):
-                    params["training_size"] = training_size
-                    model_unnormalized = train(params)
-                    mse_unnormalized.append(eval(model_unnormalized, params))
-                results[str(task_id)]["unnormalized"][str(seed)] = mse_unnormalized
             with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
                 json.dump(results, f)
 
@@ -115,11 +105,8 @@ if __name__ == '__main__':
             results[str(task_id)]["unnormalized"][str(seed)] for seed in range(args.num_trials)
         ]
         mean_mse_normalized = np.mean(mse_normalized_list, axis=0)
-        mean_mse_unnormalized = np.mean(mse_unnormalized_list, axis=0)
         lower_quantile_normalized = np.quantile(mse_normalized_list, q=0.25, axis=0)
-        lower_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.25, axis=0)
         upper_quantile_normalized = np.quantile(mse_normalized_list, q=0.75, axis=0)
-        upper_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.75, axis=0)
 
         # plot results
         plt.plot(np.arange(500, 3000, 500), mean_mse_normalized, label="Normalized")
@@ -129,15 +116,7 @@ if __name__ == '__main__':
             upper_quantile_normalized,
             alpha=0.3,
         )
-        plt.plot(np.arange(500, 3000, 500), mean_mse_unnormalized, label="Unnormalized")
-        plt.fill_between(
-            np.arange(500, 3000, 500),
-            lower_quantile_unnormalized,
-            upper_quantile_unnormalized,
-            alpha=0.3,
-        )
         plt.xlabel('Train set size (N)')
         plt.ylabel(f'Test MSE on N = {params["testing_size"]}')
         plt.title(f'Task {params["task_id"]}')
-        plt.legend()
         plt.savefig(os.path.join(params["log_dir"], f'task{params["task_id"]}_plot.png'))
