@@ -108,9 +108,34 @@ if __name__ == '__main__':
             with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
                 json.dump(results, f)
 
+        mse_normalized_list = [
+            results[str(task_id)]["normalized"][str(seed)] for seed in range(args.num_trials)
+        ]
+        mse_unnormalized_list = [
+            results[str(task_id)]["unnormalized"][str(seed)] for seed in range(args.num_trials)
+        ]
+        mean_mse_normalized = np.mean(mse_normalized_list, axis=0)
+        mean_mse_unnormalized = np.mean(mse_unnormalized_list, axis=0)
+        lower_quantile_normalized = np.quantile(mse_normalized_list, q=0.25, axis=0)
+        lower_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.25, axis=0)
+        upper_quantile_normalized = np.quantile(mse_normalized_list, q=0.75, axis=0)
+        upper_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.75, axis=0)
+
         # plot results
-        plt.plot(np.arange(500,3000,500), mse_normalized, label='Normalized')
-        plt.plot(np.arange(500,3000,500), mse_unnormalized, label='Unnormalized')
+        plt.plot(np.arange(500, 3000, 500), mean_mse_normalized, label="Normalized")
+        plt.fill_between(
+            np.arange(500, 3000, 500),
+            lower_quantile_normalized,
+            upper_quantile_normalized,
+            alpha=0.3,
+        )
+        plt.plot(np.arange(500, 3000, 500), mean_mse_unnormalized, label="Unnormalized")
+        plt.fill_between(
+            np.arange(500, 3000, 500),
+            lower_quantile_unnormalized,
+            upper_quantile_unnormalized,
+            alpha=0.3,
+        )
         plt.xlabel('Train set size (N)')
         plt.ylabel(f'Test MSE on N = {params["testing_size"]}')
         plt.title(f'Task {params["task_id"]}')
