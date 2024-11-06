@@ -134,4 +134,4 @@ if __name__ == '__main__':
         plt.title(f'Task {params["task_id"]}')
         plt.legend()
         plt.yscale('log')
-        plt.savefig(os.path.join(params["log_dir"], f'task{params['task_id']}_plot.png'))
+        plt.savefig(os.path.join(params["log_dir"], f"task{params['task_id']}_plot.png"))
