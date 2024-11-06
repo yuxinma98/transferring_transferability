@@ -42,18 +42,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     params = {
-        #logger parameters
+        # logger parameters
         "project": "anydim_transferability",
-        "name": "DeepSet",
+        "name": "transferability",
         "logger": True,
         "log_checkpoint": False,
         "log_model": None,
-        "log_dir": os.path.join(CURRENT_DIR, "log/"),
+        "log_dir": os.path.join(CURRENT_DIR, "log/transferability"),
         # data parameters
         "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
         "batch_size": 128,
         # model parameters
-        "model":{
+        "model": {
             "hidden_channels": args.hidden_channels,
             "set_channels": args.set_channels,
             "feature_extractor_num_layers": args.num_layers,
@@ -65,18 +65,16 @@ if __name__ == '__main__':
         "lr_patience": 50,
         "weight_decay": 0.1,
         "max_epochs": args.max_epochs,
-        "training_seed":42,
+        "training_seed": 42,
     }
     if not os.path.exists(params["log_dir"]):
         os.makedirs(params["log_dir"])
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
-    if not os.path.exists(params["log_dir"] + "/transferability"):
-        os.makedirs(params["log_dir"] + "/transferability")
 
     # load results
     try:
-        with open(os.path.join(params["log_dir"], "transferability/results.json"), "r") as f:
+        with open(os.path.join(params["log_dir"], "results.json"), "r") as f:
             results = json.load(f)
     except:
         results = {}
@@ -106,9 +104,9 @@ if __name__ == '__main__':
                     model_unnormalized = train(params)
                     mse_unnormalized.append(eval(model_unnormalized, params))
                 results[str(task_id)]["unnormalized"][str(seed)] = mse_unnormalized
-            with open(os.path.join(params["log_dir"], "transferability/results.json"), "w") as f:
+            with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
                 json.dump(results, f)
-                
+
         # plot results
         plt.plot(np.arange(500,3000,500), mse_normalized, label='Normalized')
         plt.plot(np.arange(500,3000,500), mse_unnormalized, label='Unnormalized')
@@ -116,4 +114,4 @@ if __name__ == '__main__':
         plt.ylabel(f'Test MSE on N = {params["testing_size"]}')
         plt.title(f'Task {params["task_id"]}')
         plt.legend()
-        plt.savefig(os.path.join(params["log_dir"], f'transferability/task{params["task_id"]}_plot.png'))   
+        plt.savefig(os.path.join(params["log_dir"], f'task{params["task_id"]}_plot.png'))

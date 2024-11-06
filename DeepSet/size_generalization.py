@@ -50,7 +50,7 @@ if __name__ == '__main__':
         "logger": True,
         "log_checkpoint": False,
         "log_model": None,
-        "log_dir": os.path.join(CURRENT_DIR, "log/"),
+        "log_dir": os.path.join(CURRENT_DIR, "log/size_generalization"),
         # data parameters
         "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
         "training_size": args.training_size,
@@ -74,12 +74,10 @@ if __name__ == '__main__':
         os.makedirs(params["log_dir"])
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
-    if not os.path.exists(params["log_dir"] + "/size_generalization"):
-        os.makedirs(params["log_dir"] + "/size_generalization")
 
     # load results
     try:
-        with open(os.path.join(params["log_dir"], 'size_generalization/results.json'), 'r') as f:
+        with open(os.path.join(params["log_dir"], 'results.json'), 'r') as f:
             results = json.load(f)
     except:
         results = {}
@@ -104,7 +102,7 @@ if __name__ == '__main__':
                 results[str(task_id)]["unnormalized"][
                     str(seed)
                 ] = mse_unnormalized
-            with open(os.path.join(params["log_dir"], 'size_generalization/results.json'), 'w') as f:
+            with open(os.path.join(params["log_dir"], 'results.json'), 'w') as f:
                 json.dump(results, f)
 
         # plot results
@@ -136,4 +134,4 @@ if __name__ == '__main__':
         plt.title(f'Task {params["task_id"]}')
         plt.legend()
         plt.yscale('log')
-        plt.savefig(os.path.join(params["log_dir"], f'size_generalization/task{params["task_id"]}_plot.png'))
+        plt.savefig(os.path.join(params["log_dir"], f'task{params['task_id']}_plot.png'))
