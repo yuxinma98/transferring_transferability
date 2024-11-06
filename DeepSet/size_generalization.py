@@ -72,10 +72,10 @@ if __name__ == '__main__':
     }
     if not os.path.exists(params["log_dir"]):
         os.makedirs(params["log_dir"])
-    if not os.path.exists(params["log_dir"] + "/size_generalization"):
-        os.makedirs(params["log_dir"] + "/size_generalization")
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
+    if not os.path.exists(params["log_dir"] + "/size_generalization"):
+        os.makedirs(params["log_dir"] + "/size_generalization")
 
     # load results
     try:

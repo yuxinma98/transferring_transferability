@@ -1,7 +1,6 @@
 import os
 import argparse
-import pytorch_lightning as pl
-
+import json
 from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +8,7 @@ from data import PopStatsDataset
 from train import train
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def str2bool(value):
     if isinstance(value, bool):
@@ -19,8 +19,6 @@ def str2bool(value):
         return False
     else:
         raise argparse.ArgumentTypeError("Boolean value expected.")
-    
-
 
 def eval(model, params):
     model.eval()
@@ -28,12 +26,13 @@ def eval(model, params):
     N = params["testing_size"]
     dataset = PopStatsDataset(fname = os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat'))
     y_pred = model.predict(dataset.X)
-    return mse(y_pred, dataset.y)
+    return float(mse(y_pred, dataset.y))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--testing_size", type=int, default=5000)
+    parser.add_argument("--num_trials", type=int, default=10)
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--hidden_channels", type=int, default=50)
     parser.add_argument("--set_channels", type=int, default=50)
@@ -72,27 +71,45 @@ if __name__ == '__main__':
         os.makedirs(params["log_dir"])
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
-    
+    if not os.path.exists(params["log_dir"] + "/transferability"):
+        os.makedirs(params["log_dir"] + "/transferability")
+
+    # load results
+    try:
+        with open(os.path.join(params["log_dir"], "transferability/results.json"), "r") as f:
+            results = json.load(f)
+    except:
+        results = {}
+
     for task_id in [1,2,3,4]:
         params["task_id"] = task_id
+        results.setdefault(str(task_id), {}).setdefault("normalized", {})
+        results[str(task_id)].setdefault("unnormalized", {})
 
-        params["model"]["normalized"] = True
-        mse_normalized = []
-        for training_size in range(500, 3000, 500):
-            params["training_size"] = training_size
-            model_normalized = train(params)
-            mse_normalized.append(eval(model_normalized, params))
+        # run experiments
+        for seed in range(args.num_trials):
+            if str(seed) not in results[str(task_id)]["normalized"]:
+                params["model"]["normalized"] = True
+                mse_normalized = []
+                params["training_seed"] = seed
+                for training_size in range(500, 3000, 500):
+                    params["training_size"] = training_size
+                    model_normalized = train(params)
+                    mse_normalized.append(eval(model_normalized, params))
+                results[str(task_id)]["normalized"][str(seed)] = mse_normalized
 
-
-        params["model"]["normalized"] = False
-        mse_unnormalized = []
-        for training_size in range(500, 3000, 500):
-            params["training_size"] = training_size
-            model_unnormalized = train(params)
-            mse_unnormalized.append(eval(model_unnormalized, params))
-        model_unnormalized = train(params)
-        mse_unnormalized = eval(model_unnormalized, params)
-    
+            if str(seed) not in results[str(task_id)]["unnormalized"]:
+                params["model"]["normalized"] = False
+                mse_unnormalized = []
+                for training_size in range(500, 3000, 500):
+                    params["training_size"] = training_size
+                    model_unnormalized = train(params)
+                    mse_unnormalized.append(eval(model_unnormalized, params))
+                results[str(task_id)]["unnormalized"][str(seed)] = mse_unnormalized
+            with open(os.path.join(params["log_dir"], "transferability/results.json"), "w") as f:
+                json.dump(results, f)
+                
+        # plot results
         plt.plot(np.arange(500,3000,500), mse_normalized, label='Normalized')
         plt.plot(np.arange(500,3000,500), mse_unnormalized, label='Unnormalized')
         plt.xlabel('Train set size (N)')
