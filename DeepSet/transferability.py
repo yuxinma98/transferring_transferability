@@ -60,6 +60,7 @@ if __name__ == '__main__':
             "feature_extractor_num_layers": args.num_layers,
             "regressor_num_layers": args.num_layers,
             "num_layers": args.num_layers,
+            "normalized": True,
         },
         # training parameters
         "lr": args.lr,
@@ -87,33 +88,27 @@ if __name__ == '__main__':
         # run experiments
         for seed in range(args.num_trials):
             if str(seed) not in results[str(task_id)]:
-                params["model"]["normalized"] = True
-                mse_normalized = []
+                mse_list = []
                 params["training_seed"] = seed
                 for training_size in range(500, 3000, 500):
                     params["training_size"] = training_size
-                    model_normalized = train(params, stopping_threshold=True)
-                    mse_normalized.append(eval(model_normalized, params))
-                results[str(task_id)]["normalized"][str(seed)] = mse_normalized
-            with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
-                json.dump(results, f)
+                    mse = train(params, stopping_threshold=True)
+                    mse_list.append(eval(mse, params))
+                    results[str(task_id)][str(seed)] = mse_list
+                    with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
+                        json.dump(results, f)
 
-        mse_normalized_list = [
-            results[str(task_id)]["normalized"][str(seed)] for seed in range(args.num_trials)
-        ]
-        mse_unnormalized_list = [
-            results[str(task_id)]["unnormalized"][str(seed)] for seed in range(args.num_trials)
-        ]
-        mean_mse_normalized = np.mean(mse_normalized_list, axis=0)
-        lower_quantile_normalized = np.quantile(mse_normalized_list, q=0.25, axis=0)
-        upper_quantile_normalized = np.quantile(mse_normalized_list, q=0.75, axis=0)
+        mse_list = [results[str(task_id)][str(seed)] for seed in range(args.num_trials)]
+        mean_mse = np.mean(mse_list, axis=0)
+        lower_quantile = np.quantile(mse_list, q=0.25, axis=0)
+        upper_quantile = np.quantile(mse_list, q=0.75, axis=0)
 
         # plot results
-        plt.plot(np.arange(500, 3000, 500), mean_mse_normalized, label="Normalized")
+        plt.plot(np.arange(500, 3000, 500), mean_mse, label="Normalized")
         plt.fill_between(
             np.arange(500, 3000, 500),
-            lower_quantile_normalized,
-            upper_quantile_normalized,
+            lower_quantile,
+            upper_quantile,
             alpha=0.3,
         )
         plt.xlabel('Train set size (N)')
