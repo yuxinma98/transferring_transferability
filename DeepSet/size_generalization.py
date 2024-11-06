@@ -9,6 +9,7 @@ from train import train
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 def str2bool(value):
     if isinstance(value, bool):
         return value
@@ -106,15 +107,25 @@ if __name__ == '__main__':
         mse_unnormalized_list = [results[str(task_id)]["unnormalized"][str(seed)] for seed in range(args.num_trials)]
         mean_mse_normalized = np.mean(mse_normalized_list, axis=0)
         mean_mse_unnormalized = np.mean(mse_unnormalized_list, axis=0)
-        min_mse_normalized = np.min(mse_normalized_list, axis=0)
-        max_mse_normalized = np.max(mse_normalized_list, axis=0)
-        min_mse_unnormalized = np.min(mse_unnormalized_list, axis=0)
-        max_mse_unnormalized = np.max(mse_unnormalized_list, axis=0)
-        
+        lower_quantile_normalized = np.quantile(mse_normalized_list, q=0.25, axis=0)
+        upper_quantile_normalized = np.quantile(mse_normalized_list, q=0.75, axis=0)
+        lower_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.25, axis=0)
+        upper_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.75, axis=0)
+
         plt.plot(np.arange(1000,5000,500), mean_mse_normalized, label='Normalized')
-        plt.fill_between(np.arange(1000,5000,500), min_mse_normalized, max_mse_normalized, alpha=0.3)
+        plt.fill_between(
+            np.arange(1000, 5000, 500),
+            lower_quantile_normalized,
+            upper_quantile_normalized,
+            alpha=0.3,
+        )
         plt.plot(np.arange(1000,5000,500), mean_mse_unnormalized, label='Unnormalized')
-        plt.fill_between(np.arange(1000,5000,500), min_mse_unnormalized, max_mse_unnormalized, alpha=0.3)
+        plt.fill_between(
+            np.arange(1000, 5000, 500),
+            lower_quantile_unnormalized,
+            upper_quantile_unnormalized,
+            alpha=0.3,
+        )
         plt.xlabel('Test set size (N)')
         plt.ylabel('Test MSE')
         plt.title(f'Task {params["task_id"]}')
