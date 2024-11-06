@@ -1,7 +1,6 @@
 import os
 import argparse
-import pytorch_lightning as pl
-
+import json
 from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +8,7 @@ from data import PopStatsDataset
 from train import train
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def str2bool(value):
     if isinstance(value, bool):
@@ -19,8 +19,6 @@ def str2bool(value):
         return False
     else:
         raise argparse.ArgumentTypeError("Boolean value expected.")
-    
-
 
 def eval(model, params):
     model.eval()
@@ -76,35 +74,70 @@ if __name__ == '__main__':
         os.makedirs(params["log_dir"])
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
-    
+
+    # load results
+    try:
+        with open(
+            os.path.join(params["log_dir"], "size_generalization/results.json"), "r"
+        ) as f:
+            results = json.load(f)
+    except:
+        results = {}
+
     for task_id in [1,2,3,4]:
         params["task_id"] = task_id
-        
-        mse_normalized_list = []
-        mse_unnormalized_list = []
-        for trial in range(args.num_trials):
-            params["model"]["normalized"] = True
-            params["training_seed"] = trial + 1
-            model_normalized = train(params)
-            mse_normalized = eval(model_normalized, params)
-            mse_normalized_list.append(mse_normalized[-1])
+        results.set_default(str(task_id), {})
 
-            params["model"]["normalized"] = False
-            model_unnormalized = train(params)
-            mse_unnormalized = eval(model_unnormalized, params)
-            mse_unnormalized_list.append(mse_unnormalized[-1])
+        # run experiments
+        for seed in range(args.num_trials):  # run multiple trials
+            if (
+                str(seed) not in results[str(task_id)]["normalized"]
+            ):  # skip if already done
+                params["model"]["normalized"] = True
+                params["training_seed"] = seed
+                model_normalized = train(params)
+                mse_normalized = eval(model_normalized, params)[-1]
+                results[str(task_id)]["normalized"][str(seed)] = mse_normalized
+            if str(seed) not in results[str(task_id)]["unnormalized"]:
+                params["model"]["normalized"] = False
+                model_unnormalized = train(params)
+                mse_unnormalized = eval(model_unnormalized, params)[-1]
+                results[str(task_id)]["unnormalized"][str(seed)] = mse_unnormalized
+            with open(
+                os.path.join(params["log_dir"], "size_generalization/results.json"), "w"
+            ) as f:
+                json.dump(results, f)
 
+        # plot results
+        mse_normalized_list = [
+            results[str(task_id)]["normalized"][str(seed)]
+            for seed in range(args.num_trials)
+        ]
+        mse_unnormalized_list = [
+            results[str(task_id)]["unnormalized"][str(seed)]
+            for seed in range(args.num_trials)
+        ]
         mean_mse_normalized = np.mean(mse_normalized_list, axis=0)
         mean_mse_unnormalized = np.mean(mse_unnormalized_list, axis=0)
-        min_mse_normalized = np.min(mse_normalized_list, axis=0)
-        max_mse_normalized = np.max(mse_normalized_list, axis=0)
-        min_mse_unnormalized = np.min(mse_unnormalized_list, axis=0)
-        max_mse_unnormalized = np.max(mse_unnormalized_list, axis=0)
-        
+        lower_quantile_normalized = np.quantile(mse_normalized_list, q=0.25, axis=0)
+        upper_quantile_normalized = np.quantile(mse_normalized_list, q=0.75, axis=0)
+        lower_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.25, axis=0)
+        upper_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.75, axis=0)
+
         plt.plot(np.arange(1000,5000,500), mean_mse_normalized, label='Normalized')
-        plt.fill_between(np.arange(1000,5000,500), min_mse_normalized, max_mse_normalized, alpha=0.3)
+        plt.fill_between(
+            np.arange(1000, 5000, 500),
+            lower_quantile_normalized,
+            upper_quantile_normalized,
+            alpha=0.3,
+        )
         plt.plot(np.arange(1000,5000,500), mean_mse_unnormalized, label='Unnormalized')
-        plt.fill_between(np.arange(1000,5000,500), min_mse_unnormalized, max_mse_unnormalized, alpha=0.3)
+        plt.fill_between(
+            np.arange(1000, 5000, 500),
+            lower_quantile_unnormalized,
+            upper_quantile_unnormalized,
+            alpha=0.3,
+        )
         plt.xlabel('Test set size (N)')
         plt.ylabel('Test MSE')
         plt.title(f'Task {params["task_id"]}')
