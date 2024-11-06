@@ -74,7 +74,7 @@ if __name__ == '__main__':
         os.makedirs(params["log_dir"])
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
-    
+
     # load results
     try:
         with open(os.path.join(params["log_dir"], 'size_generalization/results.json'), 'r') as f:
@@ -84,8 +84,9 @@ if __name__ == '__main__':
 
     for task_id in [1,2,3,4]:
         params["task_id"] = task_id
-        results.setdefault(str(task_id),{})
-        
+        results.setdefault(str(task_id), {}).setdefault("normalized", {})
+        results[str(task_id)].setdefault("unnormalized", {})
+
         # run experiments
         for seed in range(args.num_trials): # run multiple trials
             if str(seed) not in results[str(task_id)]["normalized"]: # skip if already done
