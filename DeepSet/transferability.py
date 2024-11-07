@@ -1,117 +1,59 @@
+import torch
 import os
-import argparse
-import json
-from torchmetrics import MeanSquaredError
-import matplotlib.pyplot as plt
 import numpy as np
-from data import PopStatsDataset
-from train import train
+import matplotlib.pyplot as plt
+
+from model import DeepSet
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+if __name__ == "__main__":
+    d = 5
+    n_samples = 1000
+    M = int(1e8)  # reference set size, set to a large number as estimated cts limit
+    log_n_range = np.arange(1, 4, 0.2)
+    log_dir = os.path.join(CURRENT_DIR, "log/transferability")
 
-def str2bool(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif value.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
+    # fix a 2-d gaussian distribution
+    L = torch.randn(d, d)
+    mu = torch.randn(d)
+    cov = L @ L.T
+    multivariate_normal = torch.distributions.MultivariateNormal(mu, cov)
 
-def eval(model, params):
+    # fix a model with random weights
+    model = DeepSet(in_channels=d, output_channels=1, hidden_dim=128, normalized=True)
     model.eval()
-    mse = MeanSquaredError()
-    N = params["testing_size"]
-    dataset = PopStatsDataset(fname = os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat'))
-    y_pred = model.predict(dataset.X)
-    return float(mse(y_pred, dataset.y))
 
+    # compute estimated limit
+    X = multivariate_normal.sample((M,)).unsqueeze(0)
+    with torch.no_grad():
+        limit = float(model(X).mean(dim=0))
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--testing_size", type=int, default=5000)
-    parser.add_argument("--num_trials", type=int, default=10)
-    parser.add_argument("--num_layers", type=int, default=3)
-    parser.add_argument("--hidden_channels", type=int, default=50)
-    parser.add_argument("--set_channels", type=int, default=50)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--max_epochs", type=int, default=5000)
-
-    args = parser.parse_args()
-
-    params = {
-        # logger parameters
-        "project": "anydim_transferability",
-        "name": "transferability",
-        "logger": True,
-        "log_checkpoint": False,
-        "log_model": None,
-        "log_dir": os.path.join(CURRENT_DIR, "log/transferability"),
-        # data parameters
-        "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
-        "batch_size": 128,
-        "testing_size": args.testing_size,
-        # model parameters
-        "model": {
-            "hidden_channels": args.hidden_channels,
-            "set_channels": args.set_channels,
-            "feature_extractor_num_layers": args.num_layers,
-            "regressor_num_layers": args.num_layers,
-            "num_layers": args.num_layers,
-            "normalized": True,
-        },
-        # training parameters
-        "lr": args.lr,
-        "lr_patience": 50,
-        "weight_decay": 0.1,
-        "max_epochs": args.max_epochs,
-        "training_seed": 42,
-    }
-    if not os.path.exists(params["log_dir"]):
-        os.makedirs(params["log_dir"])
-    if not os.path.exists(params["data_dir"]):
-        os.makedirs(params["data_dir"])
-
-    # load results
-    try:
-        with open(os.path.join(params["log_dir"], "results.json"), "r") as f:
-            results = json.load(f)
-    except:
-        results = {}
-
-    for task_id in [1,2,3,4]:
-        params["task_id"] = task_id
-        results.setdefault(str(task_id), {})
-
-        # run experiments
-        for seed in range(args.num_trials):
-            if str(seed) not in results[str(task_id)]:
-                mse_list = []
-                params["training_seed"] = seed
-                for training_size in range(500, 3000, 500):
-                    params["training_size"] = training_size
-                    mse = train(params, stopping_threshold=True)
-                    mse_list.append(eval(mse, params))
-                    results[str(task_id)][str(seed)] = mse_list
-                    with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
-                        json.dump(results, f)
-
-        mse_list = [results[str(task_id)][str(seed)] for seed in range(args.num_trials)]
-        mean_mse = np.mean(mse_list, axis=0)
-        lower_quantile = np.quantile(mse_list, q=0.25, axis=0)
-        upper_quantile = np.quantile(mse_list, q=0.75, axis=0)
-
-        # plot results
-        plt.plot(np.arange(500, 3000, 500), mean_mse, label="Normalized")
-        plt.fill_between(
-            np.arange(500, 3000, 500),
-            lower_quantile,
-            upper_quantile,
-            alpha=0.3,
+    # compute errors
+    n_range = np.power(10, log_n_range).astype(int)
+    errors_mean = np.zeros_like(n_range, dtype=float)
+    errors_std = np.zeros_like(n_range, dtype=float)
+    for i, n in enumerate(n_range):
+        X = multivariate_normal.sample(
+            (
+                n_samples,
+                n,
+            )
         )
-        plt.xlabel('Train set size (N)')
-        plt.ylabel(f'Test MSE on N = {params["testing_size"]}')
-        plt.title(f'Task {params["task_id"]}')
-        plt.savefig(os.path.join(params["log_dir"], f'task{params["task_id"]}_plot.png'))
+        with torch.no_grad():
+            y = model(X)
+        error = torch.abs(y - limit)
+        errors_mean[i] = float(error.mean(dim=0).squeeze())
+        errors_std[i] = float(error.std(dim=0).squeeze())
+
+    # plot
+    plt.figure()
+    plt.errorbar(n_range, errors_mean, errors_std, fmt="o", capsize=3, markersize=5)
+    reference = n_range ** (-0.5) * n_range[0] ** (0.5) * errors_mean[0]
+    plt.plot(n_range, reference, label="$n^{-0.5}$")
+    plt.xlabel("Set size $n$")
+    plt.ylabel("$|f_n(x) - f_m(x)|$")
+    plt.legend()
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.savefig(os.path.join(log_dir, "transferability.png"))
