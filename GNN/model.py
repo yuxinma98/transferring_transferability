@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 import torch_geometric as pyg
-    
+
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
         super().__init__()
@@ -19,7 +19,6 @@ class GNN_layer(nn.Module):
         self.X1_l3, self.X1_l4, self.X1_l5, self.X1_l6 = nn.ModuleList([nn.Linear(1, out_channels, bias=False) for _ in range(4)])
         self.X2_l1, self.X2_l2 = nn.ModuleList([nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)])
         self.X2_l3, self.X2_l4, self.X2_l5, self.X2_l6 = nn.ModuleList([nn.Linear(1, out_channels, bias=False) for _ in range(4)])
-        
 
     def forward(self, A: Tensor, X: Tensor) -> Tensor:
         """
@@ -64,7 +63,7 @@ class GNN_layer(nn.Module):
             X2_transform += self.X2_l5(mean_diag_part)
 
         out = A_transform.matmul(X2_transform) / n + X1_transform
-        return out
+        return A_transform, out
 
 class GNN(nn.Module):
     def __init__(self, in_channels: int, hidden_channels: int, num_layers: int, out_channels: int,
@@ -103,7 +102,7 @@ class GNN(nn.Module):
         """
         for layer in self.layers:
             if isinstance(layer, GNN_layer):
-                X = layer(A, X)
+                A, X = layer(A, X)
             else:
                 X = layer(X)
         return X
