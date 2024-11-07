@@ -106,32 +106,39 @@ if __name__ == '__main__':
                 json.dump(results, f)
 
         # plot results
-        mse_normalized_list = [results[str(task_id)]["normalized"][str(seed)] for seed in range(args.num_trials)]
-        mse_unnormalized_list = [results[str(task_id)]["unnormalized"][str(seed)] for seed in range(args.num_trials)]
-        mean_mse_normalized = np.mean(mse_normalized_list, axis=0)
-        mean_mse_unnormalized = np.mean(mse_unnormalized_list, axis=0)
-        lower_quantile_normalized = np.quantile(mse_normalized_list, q=0.25, axis=0)
-        upper_quantile_normalized = np.quantile(mse_normalized_list, q=0.75, axis=0)
-        lower_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.25, axis=0)
-        upper_quantile_unnormalized = np.quantile(mse_unnormalized_list, q=0.75, axis=0)
+        log_mse_normalized_list = [
+            np.log(results[str(task_id)]["normalized"][str(seed)])
+            for seed in range(args.num_trials)
+        ]
+        log_mse_unnormalized_list = [
+            np.log(results[str(task_id)]["unnormalized"][str(seed)])
+            for seed in range(args.num_trials)
+        ]
+        mean_mse_normalized = np.mean(log_mse_normalized_list, axis=0)
+        std_mse_normalized = np.std(log_mse_normalized_list, axis=0)
+        mean_mse_unnormalized = np.mean(log_mse_unnormalized_list, axis=0)
+        std_mse_unnormalized = np.std(log_mse_unnormalized_list, axis=0)
 
-        plt.plot(np.arange(1000,5000,500), mean_mse_normalized, label='Normalized')
+        plt.figure()
+        x = np.arange(1000, 5000, 500)
+        plt.plot(x, mean_mse_normalized, label="Normalized")
         plt.fill_between(
-            np.arange(1000, 5000, 500),
-            lower_quantile_normalized,
-            upper_quantile_normalized,
+            x,
+            mean_mse_normalized - std_mse_normalized,
+            mean_mse_normalized + std_mse_normalized,
             alpha=0.3,
         )
         plt.plot(np.arange(1000,5000,500), mean_mse_unnormalized, label='Unnormalized')
         plt.fill_between(
-            np.arange(1000, 5000, 500),
-            lower_quantile_unnormalized,
-            upper_quantile_unnormalized,
+            x,
+            mean_mse_unnormalized - std_mse_unnormalized,
+            mean_mse_unnormalized + std_mse_unnormalized,
             alpha=0.3,
         )
         plt.xlabel('Test set size (N)')
-        plt.ylabel('Test MSE')
+        plt.ylabel("log(Test MSE)")
+        plt.ylim(-10, 9)
         plt.title(f'Task {params["task_id"]}')
         plt.legend()
-        plt.yscale('log')
         plt.savefig(os.path.join(params["log_dir"], f"task{params['task_id']}_plot.png"))
+        plt.close()
