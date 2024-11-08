@@ -21,7 +21,7 @@ if __name__ == "__main__":
     multivariate_normal = torch.distributions.MultivariateNormal(mu, cov)
 
     # fix a model with random weights
-    model = DeepSet(in_channels=d, output_channels=1, hidden_dim=128, normalized=True)
+    model = DeepSet(in_channels=d, output_channels=1, normalized=True)
     model.eval()
 
     # compute estimated limit

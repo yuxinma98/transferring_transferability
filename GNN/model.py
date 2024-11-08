@@ -66,14 +66,24 @@ class GNN_layer(nn.Module):
         return A_transform, out
 
 class GNN(nn.Module):
-    def __init__(self, in_channels: int, hidden_channels: int, num_layers: int, out_channels: int,
-                 act: Callable = nn.ReLU(), **kwargs) -> None:
+
+    def __init__(
+        self,
+        in_channels: int,
+        hidden_channels: int,
+        num_layers: int,
+        out_channels: int,
+        act: Callable = nn.ReLU(),
+        reduced: bool = True,
+        **kwargs
+    ) -> None:
         super(GNN, self).__init__()
         self.in_channels = in_channels
         self.hidden_channels = hidden_channels
         self.num_layers = num_layers
         self.out_channels = out_channels
         self.act = act
+        self.reduced = reduced
         if kwargs:
             for key, value in kwargs.items():
                 setattr(self, key, value)
@@ -82,24 +92,28 @@ class GNN(nn.Module):
     def build_model(self):
         self.layers = nn.ModuleList()
         if self.num_layers == 1:
-            self.layers.append(GNN_layer(self.in_channels, self.out_channels))
+            self.layers.append(GNN_layer(self.in_channels, self.out_channels, self.reduced))
         else:
-            self.layers.append(GNN_layer(self.in_channels, self.hidden_channels))
+            self.layers.append(GNN_layer(self.in_channels, self.hidden_channels, self.reduced))
             for _ in range(self.num_layers - 2):
                 self.layers.append(self.act)
-                self.layers.append(GNN_layer(self.hidden_channels, self.hidden_channels))
+                self.layers.append(
+                    GNN_layer(self.hidden_channels, self.hidden_channels, self.reduced)
+                )
             self.layers.append(self.act)
-            self.layers.append(GNN_layer(self.hidden_channels, self.out_channels))
+            self.layers.append(GNN_layer(self.hidden_channels, self.out_channels, self.reduced))
 
-    def forward(self, A: Tensor, X: Tensor) -> Tensor:
+    def forward(self, adj: Tensor, feature: Tensor) -> Tensor:
         """
         Args:
-            A (Tensor): adjacency matrix, shape N x n x n
-            X (Tensor): graph signal, shape N x n x D1
+            adj (Tensor): adjacency matrix, shape N x n x n
+            feature (Tensor): graph signal, shape N x n x D1
 
         Returns:
             Tensor: output signal, shape N x n x D2
         """
+        A = adj.clone()
+        X = feature.clone()
         for layer in self.layers:
             if isinstance(layer, GNN_layer):
                 A, X = layer(A, X)
