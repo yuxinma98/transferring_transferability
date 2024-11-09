@@ -5,6 +5,7 @@ import torch_geometric as pyg
 import torchmetrics
 from torch_geometric.datasets import planetoid
 from model import GNN
+from data import SubsampledDataset
 
 class GNNTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:
@@ -12,7 +13,7 @@ class GNNTrainingModule(pl.LightningModule):
         self.save_hyperparameters(params) # log hyperparameters in wandb
         self.model = GNN(**params["model"])
         self.params = params
-        
+
         self.task = params["model"]["task"]
         if self.task == "classification":
             self.loss = nn.CrossEntropyLoss()
@@ -24,36 +25,23 @@ class GNNTrainingModule(pl.LightningModule):
             self.metric_name = "mse"
 
     def prepare_data(self):
-        dataset = planetoid.Planetoid(root="data/", name="Cora", split="public", transform=pyg.transforms.NormalizeFeatures())
+        dataset = planetoid.Planetoid(root="data/", name="Cora", split="public")
         data = dataset[0]
         data.A = pyg.utils.to_dense_adj(data.edge_index).squeeze(dim=0)
         self.data = data
+        self.train_data = data[data.train_mask]
+        self.val_data = data[data.val_mask]
+        self.test_data = data[data.test_mask]
 
-        num_nodes = data.num_nodes
-        sample_size = int(num_nodes * self.params["sample_fraction"])  # 1/10 of the nodes
-        sampled_nodes = torch.randperm(num_nodes, generator=torch.Generator().manual_seed(self.params["data_seed"]))[:sample_size]
-        subgraph_edge_index, subgraph_edge_attr = pyg.utils.subgraph(sampled_nodes, data.edge_index, data.edge_attr)
-        subgraph_data = data.clone()
-        subgraph_data.edge_index = subgraph_edge_index
-        subgraph_data.edge_attr = subgraph_edge_attr
-        subgraph_data.x = data.x[sampled_nodes]
-        subgraph_data.y = data.y[sampled_nodes]
-        subgraph_data.train_mask = data.train_mask[sampled_nodes]
-        subgraph_data.val_mask = data.val_mask[sampled_nodes]
-        subgraph_data.test_mask = data.test_mask[sampled_nodes]
-        subgraph_data.A = data.A[sampled_nodes, :][:, sampled_nodes]
-        self.subgraph_data = subgraph_data
-    
     def train_dataloader(self):
-        return pyg.loader.DataLoader([self.subgraph_data], batch_size=1)
-    
+        return pyg.loader.DataLoader([self.train_data], batch_size=1)
+
     def val_dataloader(self):
-        return pyg.loader.DataLoader([self.subgraph_data], batch_size=1)
-    
+        return pyg.loader.DataLoader([self.val_data], batch_size=1)
+
     def test_dataloader(self):
-        return [pyg.loader.DataLoader([self.subgraph_data], batch_size=1),
-                pyg.loader.DataLoader([self.data], batch_size=1)]
-   
+        return pyg.loader.DataLoader([self.test_data], batch_size=1))
+    
     def forward(self, data: pyg.data.Data) -> torch.Tensor:
         A = data.A # n x n
         X = data.x # n x D1
@@ -100,7 +88,7 @@ class GNNTrainingModule(pl.LightningModule):
     def on_test_start(self):
         super().on_test_start()
         self.test_metric = {}
-    
+
     def test_step(self, batch: pyg.data.Data, batch_idx, dataloader_idx=0) -> None:
         loss, metric = self._compute_loss_and_metrics(batch, mode="test")
         self.test_metric[dataloader_idx] = metric
@@ -122,7 +110,7 @@ class GNNTrainingModule(pl.LightningModule):
             mask = getattr(data, f"{mode}_mask")
         except AttributeError:
             raise f"Unknown forward mode: {mode}"
-        
+
         out, pred = self.forward(data)
         loss = self.loss(out[mask], data.y[mask])
         metric = self.metric(pred[mask], data.y[mask])
