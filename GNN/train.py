@@ -1,11 +1,47 @@
+import wandb
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 import torch_geometric as pyg
 import torchmetrics
 from torch_geometric.datasets import planetoid
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+
 from model import GNN
-from data import SubsampledDataset
+
+
+def train(params):
+    pl.seed_everything(params["training_seed"])
+    model = GNNTrainingModule(params)
+    model_checkpoint = ModelCheckpoint(
+        filename="{epoch}-{step}-{val_loss:.2f}",
+        save_last=True,
+        mode="max",
+        monitor="val_acc",
+    )
+    if params["logger"]:
+        logger = WandbLogger(
+            project=params["project"],
+            name=params["name"],
+            log_model=params["log_checkpoint"],
+            save_dir=params["log_dir"],
+        )
+        logger.watch(model, log=params["log_model"], log_freq=50)
+    trainer = pl.Trainer(
+        callbacks=[model_checkpoint],
+        devices=1,
+        max_epochs=params["max_epochs"],
+        logger=logger if params["logger"] else None,
+        enable_progress_bar=True,
+    )
+    trainer.fit(model)
+    if params["logger"]:
+        logger.experiment.unwatch(model)
+    trainer.test(model, verbose=True, ckpt_path="best")
+    wandb.finish()
+
 
 class GNNTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:
@@ -29,22 +65,26 @@ class GNNTrainingModule(pl.LightningModule):
         data = dataset[0]
         data.A = pyg.utils.to_dense_adj(data.edge_index).squeeze(dim=0)
         self.data = data
-        self.train_data = data[data.train_mask]
-        self.val_data = data[data.val_mask]
-        self.test_data = data[data.test_mask]
 
     def train_dataloader(self):
-        return pyg.loader.DataLoader([self.train_data], batch_size=1)
+        return pyg.loader.DataLoader([self.data], batch_size=1)
 
     def val_dataloader(self):
-        return pyg.loader.DataLoader([self.val_data], batch_size=1)
+        return pyg.loader.DataLoader([self.data], batch_size=1)
 
     def test_dataloader(self):
-        return pyg.loader.DataLoader([self.test_data], batch_size=1)
+        return pyg.loader.DataLoader([self.data], batch_size=1)
 
-    def forward(self, data: pyg.data.Data) -> torch.Tensor:
-        A = data.A # n x n
-        X = data.x # n x D1
+    def forward(self, data: pyg.data.Data, mode: str) -> torch.Tensor:
+        if mode == "train":
+            mask = data.train_mask
+        elif mode == "val":
+            mask = data.val_mask
+        elif mode == "test":
+            mask = data.test_mask
+
+        A = data.A[mask, mask]  # n x n
+        X = data.x[mask, mask]  # n x D1
         out = self.model(A.unsqueeze(0), X.unsqueeze(0)).squeeze(0)
 
         # Compute predictions
@@ -74,36 +114,25 @@ class GNNTrainingModule(pl.LightningModule):
 
     def training_step(self, batch: pyg.data.Data, batch_idx) -> torch.Tensor:
         loss, metric = self._compute_loss_and_metrics(batch, mode="train")
-        self.log_dict({"train_loss": loss, 
-                       f"train_{self.metric_name}": metric},
-                       batch_size=len(batch))
+        self.log_dict(
+            {"train_loss": loss, f"train_{self.metric_name}": metric}, batch_size=len(batch)
+        )
         return loss
 
     def validation_step(self, batch: pyg.data.Data, batch_idx) -> None:
         loss, metric = self._compute_loss_and_metrics(batch, mode="val")
-        self.log_dict({"val_loss": loss, 
-                       f"val_{self.metric_name}": metric},
-                       batch_size=len(batch))
+        self.log_dict({"val_loss": loss, f"val_{self.metric_name}": metric}, batch_size=len(batch))
 
     def on_test_start(self):
         super().on_test_start()
         self.test_metric = {}
 
-    def test_step(self, batch: pyg.data.Data, batch_idx, dataloader_idx=0) -> None:
+    def test_step(self, batch: pyg.data.Data, batch_idx) -> None:
         loss, metric = self._compute_loss_and_metrics(batch, mode="test")
-        self.test_metric[dataloader_idx] = metric
-        dataset_names = {
-            0: "subgraph",
-            1: "full"
-        }
-        self.log_dict({f"test_loss_{dataset_names[dataloader_idx]}": loss,
-                       f"test_{self.metric_name}_{dataset_names[dataloader_idx]}": metric},
-                        batch_size=len(batch)) 
-
-    def on_test_end(self):
-        super().on_test_end()
-        transferability = (self.test_metric[1] - self.test_metric[0])/self.test_metric[0]
-        self.logger.experiment.log({"transferability": transferability})
+        self.test_metric = metric
+        self.log_dict(
+            {f"test_loss": loss, f"test_{self.metric_namex}": metric}, batch_size=len(batch)
+        )
 
     def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
         try:
@@ -111,7 +140,7 @@ class GNNTrainingModule(pl.LightningModule):
         except AttributeError:
             raise f"Unknown forward mode: {mode}"
 
-        out, pred = self.forward(data)
+        out, pred = self.forward(data, mode)
         loss = self.loss(out[mask], data.y[mask])
         metric = self.metric(pred[mask], data.y[mask])
         return loss, metric
