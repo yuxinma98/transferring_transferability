@@ -76,15 +76,13 @@ class GNNTrainingModule(pl.LightningModule):
         return pyg.loader.DataLoader([self.data], batch_size=1)
 
     def forward(self, data: pyg.data.Data, mode: str) -> torch.Tensor:
-        if mode == "train":
-            mask = data.train_mask
-        elif mode == "val":
-            mask = data.val_mask
-        elif mode == "test":
-            mask = data.test_mask
+        try:
+            mask = getattr(data, f"{mode}_mask")
+        except AttributeError:
+            raise f"Unknown forward mode: {mode}"
 
-        A = data.A[mask, mask]  # n x n
-        X = data.x[mask, mask]  # n x D1
+        A = data.A[mask, :][:, mask]  # n x n
+        X = data.x[mask, :]  # n x D1
         out = self.model(A.unsqueeze(0), X.unsqueeze(0)).squeeze(0)
 
         # Compute predictions
@@ -131,7 +129,7 @@ class GNNTrainingModule(pl.LightningModule):
         loss, metric = self._compute_loss_and_metrics(batch, mode="test")
         self.test_metric = metric
         self.log_dict(
-            {f"test_loss": loss, f"test_{self.metric_namex}": metric}, batch_size=len(batch)
+            {f"test_loss": loss, f"test_{self.metric_name}": metric}, batch_size=len(batch)
         )
 
     def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
@@ -141,6 +139,6 @@ class GNNTrainingModule(pl.LightningModule):
             raise f"Unknown forward mode: {mode}"
 
         out, pred = self.forward(data, mode)
-        loss = self.loss(out[mask], data.y[mask])
-        metric = self.metric(pred[mask], data.y[mask])
+        loss = self.loss(out, data.y[mask])
+        metric = self.metric(pred, data.y[mask])
         return loss, metric
