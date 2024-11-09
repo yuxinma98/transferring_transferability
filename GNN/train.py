@@ -40,8 +40,8 @@ class GNNTrainingModule(pl.LightningModule):
         return pyg.loader.DataLoader([self.val_data], batch_size=1)
 
     def test_dataloader(self):
-        return pyg.loader.DataLoader([self.test_data], batch_size=1))
-    
+        return pyg.loader.DataLoader([self.test_data], batch_size=1)
+
     def forward(self, data: pyg.data.Data) -> torch.Tensor:
         A = data.A # n x n
         X = data.x # n x D1
