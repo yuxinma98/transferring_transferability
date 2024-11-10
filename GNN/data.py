@@ -4,7 +4,6 @@ from torch_geometric.utils import to_dense_adj, dense_to_sparse
 from torch_geometric.data import InMemoryDataset, Data
 from torch_geometric.datasets import Planetoid
 
-
 class SubsampledDataset(InMemoryDataset):
     def __init__(self, root, dataset_name, n_samples, n_nodes, transform=None, pre_transform=None):
         os.makedirs(root, exist_ok=True)
@@ -40,7 +39,8 @@ class SubsampledDataset(InMemoryDataset):
             for j in range(self.n_nodes):
                 X[j, :] = f[z[i, j], :]
                 for k in range(self.n_nodes):
-                    # pdb.set_trace()
                     A[j, k] = W[:, z[i, j], z[i, k]]
-            data_list.append(Data(x=X, edge_index=dense_to_sparse(A)[0], y=target[z[i]]))
+            data = Data(x=X, edge_index=dense_to_sparse(A)[0], y=target[z[i]])
+            data.A = A.unsqueeze(dim=0)
+            data_list.append(data)
         torch.save(self.collate(data_list), self.processed_paths[0])

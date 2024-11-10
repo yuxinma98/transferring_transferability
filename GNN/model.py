@@ -29,6 +29,12 @@ class GNN_layer(nn.Module):
         Returns:
             Tensor: output signal, shape N x n x D2
         """
+        assert A.dim() == 3 and A.shape[1] == A.shape[2], "A must be of shape N x n x n"
+        if X.dim() == 2:
+            X = X.reshape(A.shape[0], A.shape[1], -1)
+        assert (
+            X.dim() == 3 and X.shape[0] == A.shape[0] and X.shape[1] == A.shape[1]
+        ), "X must be of shape N x n x D1"
         n = A.shape[-1]  # extract dimension
         A = A.unsqueeze(dim=1) # N x 1 x n x n
         diag_part = torch.diagonal(A, dim1=-2, dim2=-1)   # N x 1 x n
