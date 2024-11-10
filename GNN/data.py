@@ -24,6 +24,8 @@ class SubsampledDataset(InMemoryDataset):
     def process(self):
         if self.dataset_name == "Cora":
             data = Planetoid(self.root, "Cora")[0]
+        elif self.dataset_name == "PubMed":
+            data = Planetoid(self.root, "PubMed")[0]
         else:
             raise ValueError(f"Dataset {self.dataset_name} is not supported.")
 

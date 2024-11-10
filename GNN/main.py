@@ -11,27 +11,36 @@ from train import train
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_samples", type=int, default=1000)
-    parser.add_argument("--num_layers", type=int, default=1)
-    parser.add_argument("--hidden_channels", type=int, default=50)
-    parser.add_argument("--lr", type=float, default=5e-3)
-    parser.add_argument("--num_trials", type=int, default=5)
-    parser.add_argument("--max_epochs", type=int, default=10)
+    # Experiment set-ups
+    parser.add_argument(
+        "--dataset", type=str, default="Cora", choices=["Cora", "PubMed"], help="Dataset to use"
+    )
+    parser.add_argument(
+        "--n_samples",
+        type=int,
+        default=1000,
+        help="In the transferability experiment, for each graph size n, how many samples to generate from the step graphon",
+    )
+    # GNN parameters
+    parser.add_argument("--num_layers", type=int, default=3, help="Number of GNN layers")
+    parser.add_argument("--hidden_channels", type=int, default=50, help="Number of hidden channels")
+    parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
+    parser.add_argument("--max_epochs", type=int, default=10, help="Maximum number of epochs")
 
     args = parser.parse_args()
     params = {
         # logger parameters
-        "project": "anydim_transferability",
-        "name": "GNN",
-        "logger": False,
-        "log_checkpoint": False,
-        "log_model": None,
-        "log_dir": "log/",
+        "project": "anydim_transferability",  # wandb project name
+        "name": "GNN",  # wandb run name
+        "logger": False,  # whether to use wandb to log
+        "log_checkpoint": False,  # whether to log model checkpoint in wandb
+        "log_model": None,  # model to log in wandb
+        "log_dir": "log/",  # directory to save logs
         # data parameters
-        "batch_size": 20,
+        "dataset": args.dataset,
+        "batch_size": 20,  # batch size to use in trasnferability experiment (set smaller to avoid memory issues)
         # model parameters
         "model": {
-            "in_channels": 1433,
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
             "out_channels": 7,  # classification into 7 classes
@@ -47,26 +56,32 @@ if __name__ == "__main__":
     trainer, model = train(params)
     model.eval()
 
+    # transferability experiment
     with torch.no_grad():
+        # use GNN output on full graph as reference
         predict_loader = DataLoader([model.data], batch_size=1, shuffle=False)
         reference_out = trainer.predict(model, predict_loader, ckpt_path="best")[0]
-        log_n_range = np.arange(1, 3, 0.1)
+
+        log_n_range = np.arange(1, 3.1, 0.5)
         n_range = np.power(10, log_n_range).astype(int)
         errors_mean = np.zeros_like(n_range, dtype=float)
         errors_std = np.zeros_like(n_range, dtype=float)
-        # errors_mean_full = np.zeros_like(n_range, dtype=float)
-        # errors_std_full = np.zeros_like(n_range, dtype=float)
         for i, n in enumerate(n_range):
-            subsampled_data = SubsampledDataset("data/", "Cora", args.n_samples, n)
+            # sample smaller graphs and graph signals from the step graphon
+            subsampled_data = SubsampledDataset("data/", args.dataset, args.n_samples, n)
             test_loader = DataLoader(
                 [data for data in subsampled_data], batch_size=params["batch_size"], shuffle=False
             )
+            # compute GNN output on subsampled graphs
             out = trainer.predict(model, test_loader, ckpt_path="best")
             out = torch.cat(out, dim=0)
+
+            # compute errors from the n_samples small graphs; record mean and std of errors
             errors = torch.abs(out - reference_out)
             errors_mean[i] = errors.mean().item()
             errors_std[i] = errors.std().item()
 
+    # plot and log transferability results
     plt.figure()
     plt.errorbar(
         n_range, errors_mean, errors_std, fmt="o", capsize=3, markersize=5, label="Reduced model"

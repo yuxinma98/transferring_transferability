@@ -46,8 +46,7 @@ def train(params):
 class GNNTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:
         super().__init__()
-        self.save_hyperparameters(params) # log hyperparameters in wandb
-        self.model = GNN(**params["model"])
+        self.save_hyperparameters(params)  # log hyperparameters in wandb
         self.params = params
 
         self.task = params["model"]["task"]
@@ -61,10 +60,15 @@ class GNNTrainingModule(pl.LightningModule):
             self.metric_name = "mse"
 
     def prepare_data(self):
-        dataset = planetoid.Planetoid(root="data/", name="Cora", split="full")
+        if self.params["dataset"] == "Cora":
+            dataset = planetoid.Planetoid(root="data/", name="Cora", split="full")
+        elif self.params["dataset"] == "PubMed":
+            dataset = planetoid.Planetoid(root="data/", name="PubMed", split="full")
         data = dataset[0]
         data.A = pyg.utils.to_dense_adj(data.edge_index)
         self.data = data
+        self.params["model"]["in_channels"] = data.x.shape[-1]
+        self.model = GNN(**self.params["model"])
 
     def train_dataloader(self):
         return pyg.loader.DataLoader([self.data], batch_size=1)
