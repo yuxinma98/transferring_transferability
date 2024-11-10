@@ -40,7 +40,7 @@ def train(params):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, verbose=True, ckpt_path="best")
-    wandb.finish()
+    return trainer, model
 
 
 class GNNTrainingModule(pl.LightningModule):
@@ -61,9 +61,9 @@ class GNNTrainingModule(pl.LightningModule):
             self.metric_name = "mse"
 
     def prepare_data(self):
-        dataset = planetoid.Planetoid(root="data/", name="Cora", split="public")
+        dataset = planetoid.Planetoid(root="data/", name="Cora", split="full")
         data = dataset[0]
-        data.A = pyg.utils.to_dense_adj(data.edge_index).squeeze(dim=0)
+        data.A = pyg.utils.to_dense_adj(data.edge_index)
         self.data = data
 
     def train_dataloader(self):
@@ -75,22 +75,8 @@ class GNNTrainingModule(pl.LightningModule):
     def test_dataloader(self):
         return pyg.loader.DataLoader([self.data], batch_size=1)
 
-    def forward(self, data: pyg.data.Data, mode: str) -> torch.Tensor:
-        try:
-            mask = getattr(data, f"{mode}_mask")
-        except AttributeError:
-            raise f"Unknown forward mode: {mode}"
-
-        A = data.A[mask, :][:, mask]  # n x n
-        X = data.x[mask, :]  # n x D1
-        out = self.model(A.unsqueeze(0), X.unsqueeze(0)).squeeze(0)
-
-        # Compute predictions
-        if self.task == "classification":
-            pred = torch.argmax(out, dim=-1)
-        elif self.task == "regression":
-            pred = out
-        return out, pred
+    def forward(self, data: pyg.data.Data) -> torch.Tensor:
+        return self.model(data.A, data.x).squeeze(0)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -121,10 +107,6 @@ class GNNTrainingModule(pl.LightningModule):
         loss, metric = self._compute_loss_and_metrics(batch, mode="val")
         self.log_dict({"val_loss": loss, f"val_{self.metric_name}": metric}, batch_size=len(batch))
 
-    def on_test_start(self):
-        super().on_test_start()
-        self.test_metric = {}
-
     def test_step(self, batch: pyg.data.Data, batch_idx) -> None:
         loss, metric = self._compute_loss_and_metrics(batch, mode="test")
         self.test_metric = metric
@@ -132,13 +114,26 @@ class GNNTrainingModule(pl.LightningModule):
             {f"test_loss": loss, f"test_{self.metric_name}": metric}, batch_size=len(batch)
         )
 
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        return (
+            self.forward(batch).mean(dim=-1).mean(dim=-1)
+        )  # mean over nodes and features, shape (N,)
+        # if self.task == "classification":
+        #     return out, torch.argmax(out, dim=-1)
+        # elif self.task == "regression":
+        #     return out
+
     def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
         try:
             mask = getattr(data, f"{mode}_mask")
         except AttributeError:
             raise f"Unknown forward mode: {mode}"
 
-        out, pred = self.forward(data, mode)
-        loss = self.loss(out, data.y[mask])
-        metric = self.metric(pred, data.y[mask])
+        out = self.forward(data)
+        if self.task == "classification":
+            pred = torch.argmax(out, dim=-1)
+        elif self.task == "regression":
+            pred = out
+        loss = self.loss(out[mask], data.y[mask])
+        metric = self.metric(pred[mask], data.y[mask])
         return loss, metric
