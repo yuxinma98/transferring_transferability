@@ -2,7 +2,6 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from torch import Tensor
-import torch_geometric as pyg
 
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
@@ -70,6 +69,44 @@ class GNN_layer(nn.Module):
 
         out = A_transform.matmul(X2_transform) / n + X1_transform
         return A_transform, out
+
+
+class GNNSimple_layer(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
+        super().__init__()
+        self.in_channels = in_channels  # D1
+        self.out_channels = out_channels  # D2
+        self.reduced = reduced
+
+        # Initialize parameters
+        self.X1_l1, self.X1_l2 = nn.ModuleList(
+            [nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)]
+        )
+
+    def forward(self, A: Tensor, X: Tensor) -> Tensor:
+        """
+        Args:
+            A (Tensor): adjacency matrix, shape N x n x n
+            X (Tensor): graph signal, shape N x n x D1
+
+        Returns:
+            Tensor: output signal, shape N x n x D2
+        """
+        assert A.dim() == 3 and A.shape[1] == A.shape[2], "A must be of shape N x n x n"
+        if X.dim() == 2:
+            X = X.reshape(A.shape[0], A.shape[1], -1)
+        assert (
+            X.dim() == 3 and X.shape[0] == A.shape[0] and X.shape[1] == A.shape[1]
+        ), "X must be of shape N x n x D1"
+        n = A.shape[-1]  # extract dimension
+        A = A.unsqueeze(dim=1)  # N x 1 x n x n
+
+        X1_transform = self.X1_l1(X)
+        X2_transform = self.X2_l1(X)
+
+        out = A.matmul(X2_transform) / n + X1_transform
+        return A, out
+
 
 class GNN(nn.Module):
 
