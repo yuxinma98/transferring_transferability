@@ -1,42 +1,103 @@
 import torch
+import argparse
 import os
 import numpy as np
+import h5py
+from typing import Union
 import matplotlib.pyplot as plt
 
-from model import DeepSet
+from train import train
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
+def nrange(value: Union[str, list]) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        return list(np.arange(*map(float, value.split(":"))))
+
+
 if __name__ == "__main__":
-    d = 5
-    n_samples = 1000
-    M = int(1e8)  # reference set size, set to a large number as estimated cts limit
-    log_n_range = np.arange(1, 4, 0.2)
-    log_dir = os.path.join(CURRENT_DIR, "log/transferability")
+    parser = argparse.ArgumentParser()
+    # Experiment set-up
+    parser.add_argument("--training_size", type=int, default=500, help="Set size of training data")
+    parser.add_argument("--n_samples", type=int, default=1000, help="Number of samples to generate")
+    parser.add_argument(
+        "--reference_set_size", type=int, default=int(1e8), help="Reference set size"
+    )
+    parser.add_argument(
+        "--log_n_range",
+        type=nrange,
+        default="1:4:0.2",
+        help="Log range of set sizes",
+    )
 
-    # fix a 2-d gaussian distribution
-    L = torch.randn(d, d)
-    mu = torch.randn(d)
-    cov = L @ L.T
-    multivariate_normal = torch.distributions.MultivariateNormal(mu, cov)
+    # DeepSet model parameters
+    parser.add_argument("--num_layers", type=int, default=3)
+    parser.add_argument("--hidden_channels", type=int, default=50)
+    parser.add_argument("--set_channels", type=int, default=50)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--max_epochs", type=int, default=1000)
 
-    # fix a model with random weights
-    model = DeepSet(in_channels=d, output_channels=1, normalized=True)
+    args = parser.parse_args()
+
+    params = {
+        # logger parameters
+        "project": "anydim_transferability",
+        "name": "deepset_transferability",
+        "logger": True,
+        "log_checkpoint": False,
+        "log_model": None,
+        "log_dir": os.path.join(CURRENT_DIR, "log/transferability"),
+        # data parameters
+        "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
+        "training_size": args.training_size,
+        "batch_size": 128,
+        # model parameters
+        "task_id": 1,
+        "model": {
+            "hidden_channels": args.hidden_channels,
+            "set_channels": args.set_channels,
+            "feature_extractor_num_layers": args.num_layers,
+            "regressor_num_layers": args.num_layers,
+            "num_layers": args.num_layers,
+            "normalized": True,
+        },
+        # training parameters
+        "lr": args.lr,
+        "lr_patience": 50,
+        "weight_decay": 0.1,
+        "max_epochs": args.max_epochs,
+        "training_seed": 0,
+    }
+    if not os.path.exists(params["log_dir"]):
+        os.makedirs(params["log_dir"])
+    if not os.path.exists(params["data_dir"]):
+        os.makedirs(params["data_dir"])
+
+    model = train(params)
     model.eval()
 
+    # Load distribution parameter of data
+    with h5py.File(os.path.join(params["data_dir"], "task1/matrix_A.mat"), "r") as f:
+        A = torch.tensor(f["A"][()], dtype=torch.float32)
+        cov = A @ A.T
+
     # compute estimated limit
-    X = multivariate_normal.sample((M,)).unsqueeze(0)
+    multivariate_normal = torch.distributions.MultivariateNormal(torch.zeros(2), cov)
+    X = multivariate_normal.sample((args.reference_set_size,)).unsqueeze(0)
     with torch.no_grad():
         limit = float(model(X).mean(dim=0))
 
     # compute errors
-    n_range = np.power(10, log_n_range).astype(int)
+    n_range = np.power(10, args.log_n_range).astype(int)
     errors_mean = np.zeros_like(n_range, dtype=float)
     errors_std = np.zeros_like(n_range, dtype=float)
     for i, n in enumerate(n_range):
         X = multivariate_normal.sample(
             (
-                n_samples,
+                args.n_samples,
                 n,
             )
         )
@@ -56,4 +117,4 @@ if __name__ == "__main__":
     plt.legend()
     plt.xscale("log")
     plt.yscale("log")
-    plt.savefig(os.path.join(log_dir, "transferability.png"))
+    plt.savefig(os.path.join(params["log_dir"], "transferability.png"))
