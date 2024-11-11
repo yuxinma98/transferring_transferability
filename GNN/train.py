@@ -122,10 +122,6 @@ class GNNTrainingModule(pl.LightningModule):
         return (
             self.forward(batch).mean(dim=-1).mean(dim=-1)
         )  # mean over nodes and features, shape (N,)
-        # if self.task == "classification":
-        #     return out, torch.argmax(out, dim=-1)
-        # elif self.task == "regression":
-        #     return out
 
     def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
         try:

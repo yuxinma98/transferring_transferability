@@ -21,21 +21,27 @@ if __name__ == "__main__":
         default=1000,
         help="In the transferability experiment, for each graph size n, how many samples to generate from the step graphon",
     )
+    parser.add_argument(
+        "--reference_graph_size", type=int, default=int(1e4), help="Reference graph size"
+    )
+    parser.add_argument(
+        "--log_n_range", type=tuple, default=(1, 3), help="Range of log n to consider"
+    )
     # GNN parameters
     parser.add_argument("--num_layers", type=int, default=3, help="Number of GNN layers")
     parser.add_argument("--hidden_channels", type=int, default=50, help="Number of hidden channels")
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
-    parser.add_argument("--max_epochs", type=int, default=10, help="Maximum number of epochs")
+    parser.add_argument("--max_epochs", type=int, default=500, help="Maximum number of epochs")
 
     args = parser.parse_args()
     params = {
         # logger parameters
         "project": "anydim_transferability",  # wandb project name
-        "name": "GNN",  # wandb run name
-        "logger": False,  # whether to use wandb to log
+        "name": "GNN_transferability",  # wandb run name
+        "logger": True,  # whether to use wandb to log
         "log_checkpoint": False,  # whether to log model checkpoint in wandb
         "log_model": None,  # model to log in wandb
-        "log_dir": "log/",  # directory to save logs
+        "log_dir": "log/transferability",  # directory to save logs
         # data parameters
         "dataset": args.dataset,
         "batch_size": 20,  # batch size to use in trasnferability experiment (set smaller to avoid memory issues)
@@ -60,9 +66,14 @@ if __name__ == "__main__":
     with torch.no_grad():
         # use GNN output on full graph as reference
         predict_loader = DataLoader([model.data], batch_size=1, shuffle=False)
-        reference_out = trainer.predict(model, predict_loader, ckpt_path="best")[0]
+        subsampled_data = SubsampledDataset("data/", args.dataset, 1, args.reference_graph_size)
+        test_loader = DataLoader(
+            [data for data in subsampled_data], batch_size=params["batch_size"], shuffle=False
+        )
+        out = trainer.predict(model, test_loader, ckpt_path="best")[0]
+        reference_out = out.mean(dim=0)
 
-        log_n_range = np.arange(1, 3.1, 0.5)
+        log_n_range = np.arange(args.log_n_range[0], args.log_n_range[1] + 0.1, 0.5)
         n_range = np.power(10, log_n_range).astype(int)
         errors_mean = np.zeros_like(n_range, dtype=float)
         errors_std = np.zeros_like(n_range, dtype=float)
@@ -93,7 +104,8 @@ if __name__ == "__main__":
     plt.legend()
     plt.xscale("log")
     plt.yscale("log")
-    plt.savefig(os.path.join(params["log_dir"], f"transferability.png"))
+    image_path = os.path.join(params["log_dir"], f"transferability_{args.dataset}.png")
+    plt.savefig(image_path)
     if params["logger"]:
-        wandb.log({"transferability": wandb.Image(os.path.join(params["log_dir"], f"transferability.png"))})
+        wandb.log({"transferability": wandb.Image(str(image_path))})
         wandb.finish()
