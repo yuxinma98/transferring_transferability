@@ -5,8 +5,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch_geometric.loader import DataLoader
+from typing import Union
 from data import SubsampledDataset
 from train import train
+
+
+def nrange(value: Union[str, list]) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        return list(np.arange(*map(float, value.split(":"))))
 
 
 if __name__ == "__main__":
@@ -25,7 +33,7 @@ if __name__ == "__main__":
         "--reference_graph_size", type=int, default=int(1e4), help="Reference graph size"
     )
     parser.add_argument(
-        "--log_n_range", type=tuple, default=(1, 3), help="Range of log n to consider"
+        "--log_n_range", type=nrange, default="1:3.5:0.5", help="Range of log n to consider"
     )
     # GNN parameters
     parser.add_argument("--num_layers", type=int, default=3, help="Number of GNN layers")
@@ -51,6 +59,7 @@ if __name__ == "__main__":
             "num_layers": args.num_layers,
             "out_channels": 7,  # classification into 7 classes
             "task": "classification",
+            "reduced": False,
         },
         # training parameters
         "lr": args.lr,
@@ -73,8 +82,7 @@ if __name__ == "__main__":
         out = trainer.predict(model, test_loader, ckpt_path="best")[0]
         reference_out = out.mean(dim=0)
 
-        log_n_range = np.arange(args.log_n_range[0], args.log_n_range[1] + 0.1, 0.5)
-        n_range = np.power(10, log_n_range).astype(int)
+        n_range = np.power(10, args.log_n_range).astype(int)
         errors_mean = np.zeros_like(n_range, dtype=float)
         errors_std = np.zeros_like(n_range, dtype=float)
         for i, n in enumerate(n_range):
