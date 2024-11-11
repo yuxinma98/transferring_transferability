@@ -20,11 +20,12 @@ def str2bool(value):
     else:
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
-def eval(model, params):
+
+def eval(model, params, test_n_range):
     model.eval()
     mse = MeanSquaredError()
     test_mse = []
-    for N in np.arange(1000,5000,500):
+    for N in test_n_range:
         dataset = PopStatsDataset(fname = os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat'))
         y_pred = model.predict(dataset.X)
         test_mse.append(float(mse(y_pred, dataset.y)))
@@ -33,8 +34,17 @@ def eval(model, params):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--training_size", type=int, default=500)
-    parser.add_argument("--num_trials", type=int, default=10)
+    # Experiment set-up
+    parser.add_argument(
+        "--test_n_range",
+        type=list,
+        default=list(np.arange(1000, 5000, 500)),
+        help="List of test set sizes",
+    )
+    parser.add_argument("--training_size", type=int, default=500, help="Set size of training data")
+    parser.add_argument("--num_trials", type=int, default=10, help="Number of trials to run")
+    
+    # DeepSet model parameters
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--hidden_channels", type=int, default=50)
     parser.add_argument("--set_channels", type=int, default=50)
@@ -93,12 +103,12 @@ if __name__ == '__main__':
                 params["model"]["normalized"] = True
                 params["training_seed"] = seed
                 model_normalized = train(params)
-                mse_normalized = eval(model_normalized, params)
+                mse_normalized = eval(model_normalized, params, args.test_n_range)
                 results[str(task_id)]["normalized"][str(seed)] = mse_normalized
             if str(seed) not in results[str(task_id)]["unnormalized"]:
                 params["model"]["normalized"] = False
                 model_unnormalized = train(params)
-                mse_unnormalized = eval(model_unnormalized, params)
+                mse_unnormalized = eval(model_unnormalized, params, args.test_n_range)
                 results[str(task_id)]["unnormalized"][
                     str(seed)
                 ] = mse_unnormalized
