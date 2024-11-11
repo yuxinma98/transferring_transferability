@@ -16,6 +16,8 @@ function [X, Y, X_parameter] = generate_task1_dataset(L, N)
 %X_parameter:
     d = 2; %dimenson
     A = rand(d); %randomly initialize cholesky of sigma
+    % Save matrix A to a separate file
+    save('data/task1/matrix_A.mat', 'A');
     X_parameter = linspace(0, pi, L)'; %rotation angles
     
 %X,Y:
