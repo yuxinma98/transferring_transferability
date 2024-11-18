@@ -127,5 +127,4 @@ def train(params, stopping_threshold=False):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
-    wandb.finish()
     return model

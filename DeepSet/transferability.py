@@ -108,7 +108,6 @@ if __name__ == "__main__":
         error = torch.abs(y - y_reference)
         errors_mean[i] = float(error.mean(dim=0).squeeze())
         errors_std[i] = float(error.std(dim=0).squeeze())
-    wandb.finish()
 
     # plot
     plt.figure()
