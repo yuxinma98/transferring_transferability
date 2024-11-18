@@ -33,7 +33,7 @@ if __name__ == "__main__":
         "--reference_graph_size", type=int, default=int(1e4), help="Reference graph size"
     )
     parser.add_argument(
-        "--log_n_range", type=nrange, default="1:3.5:0.5", help="Range of log n to consider"
+        "--log_n_range", type=nrange, default="1:3:0.2", help="Range of log n to consider"
     )
     # GNN parameters
     parser.add_argument("--num_layers", type=int, default=3, help="Number of GNN layers")
