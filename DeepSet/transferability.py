@@ -87,13 +87,18 @@ if __name__ == "__main__":
         A = torch.tensor(f["A"][()], dtype=torch.float32)
         cov = A @ A.T
 
-    # Take a large sample
+    # Take a large sample, use as step graphon
     multivariate_normal = torch.distributions.MultivariateNormal(torch.zeros(2), cov)
     X_reference = multivariate_normal.sample((args.reference_set_size,)).unsqueeze(0)
     with torch.no_grad():
         y_reference = float(model(X_reference).mean(dim=0))
 
-    # subsampling from the large sample, and compute the error
+    # subsample from step sample to get X_m
+    subsampled_data = SubsampledDataset(X_reference, n_samples=1, set_size=args.reference_set_size)
+    with torch.no_grad():
+        y_reference = model(subsampled_data[0].unsqueeze(0)).item()
+
+    # subsampling from step graphon to get X_n for a range of n
     n_range = np.power(10, args.log_n_range).astype(int)
     errors_mean = np.zeros_like(n_range, dtype=float)
     errors_std = np.zeros_like(n_range, dtype=float)
