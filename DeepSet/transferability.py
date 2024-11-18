@@ -3,10 +3,13 @@ import argparse
 import os
 import numpy as np
 import h5py
+import wandb
 from typing import Union
 import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader
 
 from train import train
+from data import SubsampledDataset
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -84,28 +87,28 @@ if __name__ == "__main__":
         A = torch.tensor(f["A"][()], dtype=torch.float32)
         cov = A @ A.T
 
-    # compute estimated limit
+    # Take a large sample
     multivariate_normal = torch.distributions.MultivariateNormal(torch.zeros(2), cov)
-    X = multivariate_normal.sample((args.reference_set_size,)).unsqueeze(0)
+    X_reference = multivariate_normal.sample((args.reference_set_size,)).unsqueeze(0)
     with torch.no_grad():
-        limit = float(model(X).mean(dim=0))
+        y_reference = float(model(X_reference).mean(dim=0))
 
-    # compute errors
+    # subsampling from the large sample, and compute the error
     n_range = np.power(10, args.log_n_range).astype(int)
     errors_mean = np.zeros_like(n_range, dtype=float)
     errors_std = np.zeros_like(n_range, dtype=float)
     for i, n in enumerate(n_range):
-        X = multivariate_normal.sample(
-            (
-                args.n_samples,
-                n,
-            )
-        )
+        subsampled_data = SubsampledDataset(X_reference, n_samples=args.n_samples, set_size=n)
+        loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
         with torch.no_grad():
-            y = model(X)
-        error = torch.abs(y - limit)
+            y = []
+            for batch in loader:
+                y.append(model(batch))
+        y = torch.cat(y, dim=0)
+        error = torch.abs(y - y_reference)
         errors_mean[i] = float(error.mean(dim=0).squeeze())
         errors_std[i] = float(error.std(dim=0).squeeze())
+    wandb.finish()
 
     # plot
     plt.figure()
