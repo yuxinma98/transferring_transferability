@@ -57,7 +57,7 @@ if __name__ == "__main__":
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
             "task": "classification",
-            "reduced": False,
+            "reduced": True,
         },
         # training parameters
         "lr": args.lr,
@@ -75,9 +75,7 @@ if __name__ == "__main__":
         predict_loader = DataLoader([model.data], batch_size=1, shuffle=False)
         subsampled_data = SubsampledDataset("data/", args.dataset, 1, args.reference_graph_size)
         with torch.no_grad():
-            out = []
-            out.append(model(subsampled_data[0]))
-            out = torch.cat(out, dim=0)
+            out = model(subsampled_data[0])
         reference_out = out.mean(dim=0)
 
         n_range = np.power(10, args.log_n_range).astype(int)
