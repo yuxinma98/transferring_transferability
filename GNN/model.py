@@ -73,13 +73,13 @@ class GNN_layer(nn.Module):
 
 class GNNSimple_layer(nn.Module):
 
-    def __init__(self, in_channels: int, out_channels: int, **kwargs) -> None:
+    def __init__(self, in_channels: int, out_channels: int, reduced=False) -> None:
         super().__init__()
         self.in_channels = in_channels  # D1
         self.out_channels = out_channels  # D2
 
         # Initialize parameters
-        self.X1_l1, self.X1_l2 = nn.ModuleList(
+        self.X1_l, self.X2_l = nn.ModuleList(
             [nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)]
         )
 
@@ -91,7 +91,7 @@ class GNNSimple_layer(nn.Module):
 
         Returns:
             Tensor: output signal, shape N x n x D2
-        """
+        """)
         assert A.dim() == 3 and A.shape[1] == A.shape[2], "A must be of shape N x n x n"
         if X.dim() == 2:
             X = X.reshape(A.shape[0], A.shape[1], -1)
@@ -99,10 +99,9 @@ class GNNSimple_layer(nn.Module):
             X.dim() == 3 and X.shape[0] == A.shape[0] and X.shape[1] == A.shape[1]
         ), "X must be of shape N x n x D1"
         n = A.shape[-1]  # extract dimension
-        A = A.unsqueeze(dim=1)  # N x 1 x n x n
 
-        X1_transform = self.X1_l1(X)
-        X2_transform = self.X2_l1(X)
+        X1_transform = self.X1_l(X)
+        X2_transform = self.X2_l(X)
 
         out = A.matmul(X2_transform) / n + X1_transform
         return A, out

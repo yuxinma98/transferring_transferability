@@ -70,34 +70,32 @@ if __name__ == "__main__":
     model.eval()
 
     # transferability experiment
+    predict_loader = DataLoader([model.data], batch_size=1, shuffle=False)
+    subsampled_data = SubsampledDataset("data/", args.dataset, 1, args.reference_graph_size)
     with torch.no_grad():
-        # use GNN output on full graph as reference
-        predict_loader = DataLoader([model.data], batch_size=1, shuffle=False)
-        subsampled_data = SubsampledDataset("data/", args.dataset, 1, args.reference_graph_size)
+        out = model(subsampled_data[0])
+    reference_out = out.mean(dim=0)
+
+    n_range = np.power(10, args.log_n_range).astype(int)
+    errors_mean = np.zeros_like(n_range, dtype=float)
+    errors_std = np.zeros_like(n_range, dtype=float)
+    for i, n in enumerate(n_range):
+        # sample smaller graphs and graph signals from the step graphon
+        subsampled_data = SubsampledDataset("data/", args.dataset, args.n_samples, n)
+        test_loader = DataLoader(
+            [data for data in subsampled_data], batch_size=params["batch_size"], shuffle=False
+        )
+        # compute GNN output on subsampled graphs
         with torch.no_grad():
-            out = model(subsampled_data[0])
-        reference_out = out.mean(dim=0)
+            out = []
+            for batch in test_loader:
+                out.append(model(batch).detach())
+            out = torch.cat(out, dim=0)
 
-        n_range = np.power(10, args.log_n_range).astype(int)
-        errors_mean = np.zeros_like(n_range, dtype=float)
-        errors_std = np.zeros_like(n_range, dtype=float)
-        for i, n in enumerate(n_range):
-            # sample smaller graphs and graph signals from the step graphon
-            subsampled_data = SubsampledDataset("data/", args.dataset, args.n_samples, n)
-            test_loader = DataLoader(
-                [data for data in subsampled_data], batch_size=params["batch_size"], shuffle=False
-            )
-            # compute GNN output on subsampled graphs
-            with torch.no_grad():
-                out = []
-                for batch in test_loader:
-                    out.append(model(batch).detach())
-                out = torch.cat(out, dim=0)
-
-            # compute errors from the n_samples small graphs; record mean and std of errors
-            errors = torch.abs(out - reference_out)
-            errors_mean[i] = errors.mean().item()
-            errors_std[i] = errors.std().item()
+        # compute errors from the n_samples small graphs; record mean and std of errors
+        errors = torch.abs(out - reference_out)
+        errors_mean[i] = errors.mean().item()
+        errors_std[i] = errors.std().item()
 
     # plot and log transferability results
     plt.figure()
