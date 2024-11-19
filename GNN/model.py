@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Union
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -72,11 +72,11 @@ class GNN_layer(nn.Module):
 
 
 class GNNSimple_layer(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
+
+    def __init__(self, in_channels: int, out_channels: int, **kwargs) -> None:
         super().__init__()
         self.in_channels = in_channels  # D1
         self.out_channels = out_channels  # D2
-        self.reduced = reduced
 
         # Initialize parameters
         self.X1_l1, self.X1_l2 = nn.ModuleList(
@@ -118,6 +118,7 @@ class GNN(nn.Module):
         out_channels: int,
         act: Callable = nn.ReLU(),
         reduced: bool = True,
+        simple: Union[bool, str] = False,
         **kwargs
     ) -> None:
         super(GNN, self).__init__()
@@ -126,6 +127,7 @@ class GNN(nn.Module):
         self.num_layers = num_layers
         self.out_channels = out_channels
         self.act = act
+        self.simple = simple
         self.reduced = reduced
         if kwargs:
             for key, value in kwargs.items():
@@ -134,17 +136,21 @@ class GNN(nn.Module):
 
     def build_model(self):
         self.layers = nn.ModuleList()
-        if self.num_layers == 1:
-            self.layers.append(GNN_layer(self.in_channels, self.out_channels, self.reduced))
+        if self.simple:
+            nn_layer = GNNSimple_layer
         else:
-            self.layers.append(GNN_layer(self.in_channels, self.hidden_channels, self.reduced))
+            nn_layer = GNN_layer
+        if self.num_layers == 1:
+            self.layers.append(nn_layer(self.in_channels, self.out_channels, self.reduced))
+        else:
+            self.layers.append(nn_layer(self.in_channels, self.hidden_channels, self.reduced))
             for _ in range(self.num_layers - 2):
                 self.layers.append(self.act)
                 self.layers.append(
-                    GNN_layer(self.hidden_channels, self.hidden_channels, self.reduced)
+                    nn_layer(self.hidden_channels, self.hidden_channels, self.reduced)
                 )
             self.layers.append(self.act)
-            self.layers.append(GNN_layer(self.hidden_channels, self.out_channels, self.reduced))
+            self.layers.append(nn_layer(self.hidden_channels, self.out_channels, self.reduced))
 
     def forward(self, adj: Tensor, feature: Tensor) -> Tensor:
         """
@@ -158,7 +164,7 @@ class GNN(nn.Module):
         A = adj.clone()
         X = feature.clone()
         for layer in self.layers:
-            if isinstance(layer, GNN_layer):
+            if isinstance(layer, GNN_layer) or isinstance(layer, GNNSimple_layer):
                 A, X = layer(A, X)
             else:
                 X = layer(X)
