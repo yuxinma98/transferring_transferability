@@ -91,7 +91,7 @@ class GNNSimple_layer(nn.Module):
 
         Returns:
             Tensor: output signal, shape N x n x D2
-        """)
+        """
         assert A.dim() == 3 and A.shape[1] == A.shape[2], "A must be of shape N x n x n"
         if X.dim() == 2:
             X = X.reshape(A.shape[0], A.shape[1], -1)
