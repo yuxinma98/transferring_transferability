@@ -59,7 +59,7 @@ class GNNTrainingModule(pl.LightningModule):
         data.A = pyg.utils.to_dense_adj(data.edge_index)
         self.data = data
         self.params["model"]["in_channels"] = data.x.shape[-1]
-        self.params["model"]["num_classes"] = dataset.num_classes
+        self.params["model"]["out_channel"] = dataset.num_classes
         self.model = GNN(**self.params["model"])
 
         self.task = self.params["model"]["task"]
