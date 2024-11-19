@@ -113,5 +113,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.xscale("log")
     plt.yscale("log")
-    image_path = os.path.join(params["log_dir"], f"transferability_{args.dataset}_{params["model"]["reduced"]}.png")
+    image_path = os.path.join(
+        params["log_dir"], f"transferability_{args.dataset}_{params['model']['reduced']}.png"
+    )
     plt.savefig(image_path)
