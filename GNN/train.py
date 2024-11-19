@@ -40,7 +40,8 @@ def train(params):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, verbose=True, ckpt_path="best")
-    return trainer, model
+    wandb.finish()
+    return model
 
 
 class GNNTrainingModule(pl.LightningModule):
@@ -48,16 +49,6 @@ class GNNTrainingModule(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(params)  # log hyperparameters in wandb
         self.params = params
-
-        self.task = params["model"]["task"]
-        if self.task == "classification":
-            self.loss = nn.CrossEntropyLoss()
-            self.metric = torchmetrics.Accuracy(task="multiclass", num_classes=params["model"]["out_channels"])
-            self.metric_name = "acc"
-        elif self.task == "regression":
-            self.loss = nn.MSELoss()
-            self.metric = torchmetrics.MeanSquaredError
-            self.metric_name = "mse"
 
     def prepare_data(self):
         if self.params["dataset"] == "Cora":
@@ -68,7 +59,20 @@ class GNNTrainingModule(pl.LightningModule):
         data.A = pyg.utils.to_dense_adj(data.edge_index)
         self.data = data
         self.params["model"]["in_channels"] = data.x.shape[-1]
+        self.params["model"]["num_classes"] = dataset.num_classes
         self.model = GNN(**self.params["model"])
+
+        self.task = self.params["model"]["task"]
+        if self.task == "classification":
+            self.loss = nn.CrossEntropyLoss()
+            self.metric = torchmetrics.Accuracy(
+                task="multiclass", num_classes=self.params["model"]["out_channels"]
+            )
+            self.metric_name = "acc"
+        elif self.task == "regression":
+            self.loss = nn.MSELoss()
+            self.metric = torchmetrics.MeanSquaredError
+            self.metric_name = "mse"
 
     def train_dataloader(self):
         return pyg.loader.DataLoader([self.data], batch_size=1)
