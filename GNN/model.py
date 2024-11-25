@@ -117,7 +117,7 @@ class GNN(nn.Module):
         out_channels: int,
         act: Callable = nn.ReLU(),
         reduced: bool = True,
-        simple: Union[bool, str] = False,
+        simple: bool = False,
         **kwargs
     ) -> None:
         super(GNN, self).__init__()
