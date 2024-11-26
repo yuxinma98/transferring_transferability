@@ -1,7 +1,8 @@
-from typing import Callable, Union
+from typing import Callable
 import torch
 import torch.nn as nn
 from torch import Tensor
+from ign_layers import layer_2_to_2, layer_2_to_1
 
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
@@ -116,8 +117,7 @@ class GNN(nn.Module):
         num_layers: int,
         out_channels: int,
         act: Callable = nn.ReLU(),
-        reduced: bool = True,
-        simple: bool = False,
+        model: str = "simple",  # choices in ["simple", "reduced", "unreduced", "ign"]
         **kwargs
     ) -> None:
         super(GNN, self).__init__()
@@ -126,8 +126,8 @@ class GNN(nn.Module):
         self.num_layers = num_layers
         self.out_channels = out_channels
         self.act = act
-        self.simple = simple
-        self.reduced = reduced
+        assert model in ["simple", "reduced", "unreduced", "ign"]
+        self.model = model
         if kwargs:
             for key, value in kwargs.items():
                 setattr(self, key, value)
@@ -135,21 +135,40 @@ class GNN(nn.Module):
 
     def build_model(self):
         self.layers = nn.ModuleList()
-        if self.simple:
-            nn_layer = GNNSimple_layer
-        else:
-            nn_layer = GNN_layer
-        if self.num_layers == 1:
-            self.layers.append(nn_layer(self.in_channels, self.out_channels, self.reduced))
-        else:
-            self.layers.append(nn_layer(self.in_channels, self.hidden_channels, self.reduced))
-            for _ in range(self.num_layers - 2):
+        if self.model in ["simple", "reduced", "unreduced"]:
+            if self.model == "simple":
+                nn_layer = GNNSimple_layer
+                reduced = None
+            elif self.model == "reduced":
+                nn_layer = GNN_layer
+                reduced = True
+            elif self.model == "unreduced":
+                nn_layer = GNN_layer
+                reduced = False
+
+            if self.num_layers == 1:
+                self.layers.append(nn_layer(self.in_channels, self.out_channels, reduced))
+            else:
+                self.layers.append(nn_layer(self.in_channels, self.hidden_channels, reduced))
+                for _ in range(self.num_layers - 2):
+                    self.layers.append(self.act)
+                    self.layers.append(
+                        nn_layer(self.hidden_channels, self.hidden_channels, reduced)
+                    )
                 self.layers.append(self.act)
-                self.layers.append(
-                    nn_layer(self.hidden_channels, self.hidden_channels, self.reduced)
-                )
-            self.layers.append(self.act)
-            self.layers.append(nn_layer(self.hidden_channels, self.out_channels, self.reduced))
+                self.layers.append(nn_layer(self.hidden_channels, self.out_channels, reduced))
+
+        if self.model == "ign":
+            self.linear = nn.Linear(self.in_channels, 3)
+            if self.num_layers == 1:
+                self.layers.append(layer_2_to_1(4, self.out_channels))
+            else:
+                self.layers.append(layer_2_to_2(4, self.hidden_channels))
+                for _ in range(self.num_layers - 2):
+                    self.layers.append(self.act)
+                    self.layers.append(layer_2_to_2(self.hidden_channels, self.hidden_channels))
+                self.layers.append(self.act)
+                self.layers.append(layer_2_to_1(self.hidden_channels, self.out_channels))
 
     def forward(self, adj: Tensor, feature: Tensor) -> Tensor:
         """
@@ -162,9 +181,21 @@ class GNN(nn.Module):
         """
         A = adj.clone()
         X = feature.clone()
-        for layer in self.layers:
-            if isinstance(layer, GNN_layer) or isinstance(layer, GNNSimple_layer):
-                A, X = layer(A, X)
-            else:
+        if self.model in ["simple", "reduced", "unreduced"]:
+            for layer in self.layers:
+                if isinstance(layer, GNN_layer) or isinstance(layer, GNNSimple_layer):
+                    A, X = layer(A, X)
+                else:
+                    X = layer(X)
+            return X
+
+        if self.model == "ign":
+            if X.dim() == 2:
+                X = X.reshape(A.shape[0], A.shape[1], -1)
+            X = self.linear(X)  # N x n x 3
+            X = torch.diag_embed(X.transpose(-1, -2))  # N x 3 x n x n
+            A = A.unsqueeze(dim=1)  # N x 1 x n x n
+            X = torch.cat([A, X], dim=1)  # N x 4 x n x n
+            for layer in self.layers:
                 X = layer(X)
-        return X
+            return X.transpose(-1, -2)

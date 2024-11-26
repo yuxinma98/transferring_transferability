@@ -41,8 +41,8 @@ if __name__ == "__main__":
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
             "task": "classification",
-            "simple": True,  # choice: [True, False, "Laplacian"]
-            "reduced": True,
+            "simple": False,  # choice: [True, False, "Laplacian"]
+            "reduced": False,
         },
         # training parameters
         "lr": args.lr,

@@ -122,11 +122,6 @@ class GNNTrainingModule(pl.LightningModule):
             {f"test_loss": loss, f"test_{self.metric_name}": metric}, batch_size=len(batch)
         )
 
-    # def predict_step(self, batch, batch_idx, dataloader_idx=0):
-    #     return (
-    #         self.forward(batch).mean(dim=-1).mean(dim=-1)
-    #     )  # mean over nodes and features, shape (N,)
-
     def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
         try:
             mask = getattr(data, f"{mode}_mask")

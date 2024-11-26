@@ -57,7 +57,7 @@ if __name__ == "__main__":
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
             "task": "classification",
-            "reduced": True,
+            "model": "ign",  # choice in ["simple", "reduced", "notreduced", "ign"]
         },
         # training parameters
         "lr": args.lr,
@@ -90,17 +90,20 @@ if __name__ == "__main__":
     errors_std = np.zeros_like(n_range, dtype=float)
     for i, n in enumerate(n_range):
         # sample smaller graphs and graph signals from the step graphon
-        subsampled_data = SubsampledDataset("data/", args.dataset, args.n_samples, n)
+        subsampled_data = SubsampledDataset("data/", model, args.dataset, args.n_samples, n)
         test_loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
         # compute GNN output on subsampled graphs
+        errors = []
         with torch.no_grad():
-            out = []
             for batch in test_loader:
-                out.append(model(batch).detach().mean().item())
-            out = torch.tensor(out)
-
-        # compute errors from the n_samples small graphs; record mean and std of errors
-        errors = torch.abs(out - reference_out)
+                out = model(batch).detach()
+                target = batch.y.reshape(out.shape)  # batch_size x n x D
+                errors.append(
+                    torch.norm(out - target, p=2, dim=1)
+                    / np.sqrt(n)
+                )
+        errors = torch.cat(errors, dim=0)  # n_samples x D
+        errors = errors.max(dim=1)[0]  # n_samples
         errors_mean[i] = errors.mean().item()
         errors_std[i] = errors.std().item()
 
@@ -112,11 +115,11 @@ if __name__ == "__main__":
     y = n_range ** (-0.5) * n_range[0] ** (0.5) * errors_mean[0]
     plt.plot(n_range, y, label="$n^{-1/2}$")
     plt.xlabel("Set size $n$")
-    plt.ylabel("$|f_n(x) - f_m(x)|$")
+    plt.ylabel("$\max_j \|f_n(A_n,X_n)_{:j} - P f_m(A,X)_{:j}\|_2$")
     plt.legend()
     plt.xscale("log")
     plt.yscale("log")
     image_path = os.path.join(
-        params["log_dir"], f"transferability_{args.dataset}_{params['model']['reduced']}.png"
+        params["log_dir"], f"transferability_{args.dataset}_{params['model']['model']}.png"
     )
     plt.savefig(image_path)

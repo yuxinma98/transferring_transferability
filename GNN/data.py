@@ -2,9 +2,9 @@ import torch
 import os
 from tqdm import tqdm
 from torch_geometric.utils import to_dense_adj, dense_to_sparse
-from torch_geometric.data import InMemoryDataset, Data
+from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 
 
 class SubsampledDataset(Dataset):
@@ -17,9 +17,11 @@ class SubsampledDataset(Dataset):
             data = Planetoid(root, "PubMed")[0]
         else:
             raise ValueError(f"Dataset {self.dataset_name} is not supported.")
-        self.W = to_dense_adj(data.edge_index)[:, data.train_mask, :][:, :, data.train_mask]
-        self.f = data.x[data.train_mask, :]
-        self.target = data.y[data.train_mask]
+        data.A = to_dense_adj(data.edge_index)
+        self.W = data.A
+        self.f = data.x
+        with torch.no_grad():
+            self.target = model(data).detach()
         self.n = self.W.shape[-1]
 
     def __len__(self):
@@ -28,9 +30,9 @@ class SubsampledDataset(Dataset):
     def __getitem__(self, idx):
         z = torch.randint(0, self.n, (self.n_nodes,))
         data = Data(
-            x=self.f[z[:], :],
-            edge_index=dense_to_sparse(self.W[:, z[:], :][:, :, z[:]])[0],
-            y=self.target[z],
-            A=self.W[:, z[:], :][:, :, z[:]],
+            x=self.f[z, :],
+            edge_index=dense_to_sparse(self.W[:, z, :][:, :, z])[0],
+            A=self.W[:, z, :][:, :, z],
+            y=self.target[z, :],
         )
         return data
