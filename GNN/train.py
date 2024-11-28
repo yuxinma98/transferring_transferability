@@ -9,6 +9,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
+from data import SBM_GaussianDataset
 from model import GNN
 
 
@@ -18,8 +19,8 @@ def train(params):
     model_checkpoint = ModelCheckpoint(
         filename="{epoch}-{step}-{val_loss:.2f}",
         save_last=True,
-        mode="max",
-        monitor="val_acc",
+        mode="min",
+        monitor="val_loss",
     )
     if params["logger"]:
         logger = WandbLogger(
@@ -53,16 +54,22 @@ class GNNTrainingModule(pl.LightningModule):
     def prepare_data(self):
         if self.params["dataset"] == "Cora":
             dataset = planetoid.Planetoid(root="data/", name="Cora", split="full")
+            self.task = "classification"
         elif self.params["dataset"] == "PubMed":
             dataset = planetoid.Planetoid(root="data/", name="PubMed", split="full")
+            self.task = "classification"
+        elif self.params["dataset"] == "SBM_Gaussian":
+            dataset = SBM_GaussianDataset(root="data/")
+            self.task = "regression"
         data = dataset[0]
         data.A = pyg.utils.to_dense_adj(data.edge_index)
         self.data = data
         self.params["model"]["in_channels"] = data.x.shape[-1]
-        self.params["model"]["out_channels"] = dataset.num_classes
+        self.params["model"]["out_channels"] = (
+            dataset.num_classes if self.task == "classification" else 1
+        )
         self.model = GNN(**self.params["model"])
 
-        self.task = self.params["model"]["task"]
         if self.task == "classification":
             self.loss = nn.CrossEntropyLoss()
             self.metric = torchmetrics.Accuracy(
@@ -71,8 +78,10 @@ class GNNTrainingModule(pl.LightningModule):
             self.metric_name = "acc"
         elif self.task == "regression":
             self.loss = nn.MSELoss()
-            self.metric = torchmetrics.MeanSquaredError
+            self.metric = torchmetrics.MeanSquaredError()
             self.metric_name = "mse"
+        else:
+            raise "Unknown task"
 
     def train_dataloader(self):
         return pyg.loader.DataLoader([self.data], batch_size=1)
@@ -132,6 +141,7 @@ class GNNTrainingModule(pl.LightningModule):
         if self.task == "classification":
             pred = torch.argmax(out, dim=-1)
         elif self.task == "regression":
+            out = out.squeeze(-1)
             pred = out
         loss = self.loss(out[mask], data.y[mask])
         metric = self.metric(pred[mask], data.y[mask])
