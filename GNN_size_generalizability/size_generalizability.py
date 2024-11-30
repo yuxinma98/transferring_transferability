@@ -8,7 +8,6 @@ import torch
 from torchmetrics import MeanSquaredError
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
-import pytorch_lightning as pl
 
 from train import train
 from data import DegreeDataset
@@ -28,12 +27,21 @@ def eval(model, params, test_n_range):
     test_loss = np.zeros(len(test_n_range))
     for i, n in tqdm(enumerate(test_n_range)):
         test_params["n_nodes"] = int(n)
-        trainer = pl.Trainer(devices=1, logger=False)
-        model.params = test_params
-        model.prepare_data()
-        model.setup()
-        test_loss[i] = trainer.test(model, verbose=False)[0].get("test_loss")
-    return test_loss
+        test_dataset = DegreeDataset(
+            root=params["data_dir"],
+            N=1000,
+            n=test_params["n_nodes"],
+            d=params["feature_dim"],
+        )
+        test_loader = DataLoader(test_dataset, batch_size=test_params["batch_size"])
+        mse = MeanSquaredError()
+        with torch.no_grad():
+            for batch in test_loader:
+                out = model(batch)
+                loss = mse(out, batch.y)
+                test_loss[i] += loss.item() * len(batch)
+        test_loss[i] /= len(test_dataset)
+    return test_loss.tolist()
 
 
 if __name__ == "__main__":
@@ -114,7 +122,7 @@ if __name__ == "__main__":
     std_mse = np.std(log_mse_list, axis=0)
 
     plt.figure()
-    x = np.arange(500, 5000, 500)
+    x = np.array(args.test_n_range)
     plt.plot(x, mean_mse, label="Normalized")
     plt.fill_between(
         x,
