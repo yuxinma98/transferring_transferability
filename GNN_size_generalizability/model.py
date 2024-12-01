@@ -7,18 +7,28 @@ from ign_layers import layer_2_to_2, layer_2_to_1
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
         super().__init__()
-        self.in_channels = in_channels #D1
-        self.out_channels = out_channels #D2
+        self.in_channels = in_channels  # D1
+        self.out_channels = out_channels  # D2
         self.reduced = reduced
 
         # Initialize parameters
-        self.A_coeffs = nn.Parameter(torch.randn(5), requires_grad = True)
-        self.A_l1, self.A_l2 = nn.ModuleList([nn.Linear(in_channels, 1, bias=False) for _ in range(2)])
+        self.A_coeffs = nn.Parameter(torch.randn(5), requires_grad=True)
+        self.A_l1, self.A_l2 = nn.ModuleList(
+            [nn.Linear(in_channels, 1, bias=False) for _ in range(2)]
+        )
 
-        self.X1_l1, self.X1_l2 = nn.ModuleList([nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)])
-        self.X1_l3, self.X1_l4, self.X1_l5, self.X1_l6 = nn.ModuleList([nn.Linear(1, out_channels, bias=False) for _ in range(4)])
-        self.X2_l1, self.X2_l2 = nn.ModuleList([nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)])
-        self.X2_l3, self.X2_l4, self.X2_l5, self.X2_l6 = nn.ModuleList([nn.Linear(1, out_channels, bias=False) for _ in range(4)])
+        self.X1_l1, self.X1_l2 = nn.ModuleList(
+            [nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)]
+        )
+        self.X1_l3, self.X1_l4, self.X1_l5, self.X1_l6 = nn.ModuleList(
+            [nn.Linear(1, out_channels, bias=False) for _ in range(4)]
+        )
+        self.X2_l1, self.X2_l2 = nn.ModuleList(
+            [nn.Linear(in_channels, out_channels, bias=False) for _ in range(2)]
+        )
+        self.X2_l3, self.X2_l4, self.X2_l5, self.X2_l6 = nn.ModuleList(
+            [nn.Linear(1, out_channels, bias=False) for _ in range(4)]
+        )
 
     def forward(self, A: Tensor, X: Tensor) -> Tensor:
         """
@@ -36,21 +46,23 @@ class GNN_layer(nn.Module):
             X.dim() == 3 and X.shape[0] == A.shape[0] and X.shape[1] == A.shape[1]
         ), "X must be of shape N x n x D1"
         n = A.shape[-1]  # extract dimension
-        A = A.unsqueeze(dim=1) # N x 1 x n x n
-        diag_part = torch.diagonal(A, dim1=-2, dim2=-1)   # N x 1 x n
+        A = A.unsqueeze(dim=1)  # N x 1 x n x n
+        diag_part = torch.diagonal(A, dim1=-2, dim2=-1)  # N x 1 x n
         mean_diag_part = torch.mean(diag_part, dim=-1).unsqueeze(dim=-1)  # N x 1 x 1
         mean_of_cols = torch.mean(A, dim=-1)  # N x 1 x n
         mean_all = torch.mean(mean_of_cols, dim=-1).unsqueeze(dim=-1)  # N x 1 x 1
-        mean_X = torch.mean(X, dim=-2).unsqueeze(dim=-2) #N x 1 x D1
+        mean_X = torch.mean(X, dim=-2).unsqueeze(dim=-2)  # N x 1 x D1
 
         A_transform = self.A_coeffs[0] * A.squeeze(dim=1)
-        A_transform += self.A_coeffs[1] * mean_all 
-        A_transform += self.A_coeffs[3] * (mean_of_cols + mean_of_cols.transpose(-1,-2))
-        A_transform += (self.A_l1(X.unsqueeze(dim=-2)) + self.A_l1(X.unsqueeze(dim=-3))).squeeze(dim=-1)
-        A_transform += self.A_l2(mean_X).expand(-1,n,n)
+        A_transform += self.A_coeffs[1] * mean_all
+        A_transform += self.A_coeffs[3] * (mean_of_cols + mean_of_cols.transpose(-1, -2))
+        A_transform += (self.A_l1(X.unsqueeze(dim=-2)) + self.A_l1(X.unsqueeze(dim=-3))).squeeze(
+            dim=-1
+        )
+        A_transform += self.A_l2(mean_X).expand(-1, n, n)
         if not self.reduced:
             A_transform += self.A_coeffs[2] * mean_diag_part
-            A_transform += self.A_coeffs[4] * (diag_part + diag_part.transpose(-1,-2))
+            A_transform += self.A_coeffs[4] * (diag_part + diag_part.transpose(-1, -2))
 
         X1_transform = self.X1_l1(X)
         X1_transform += self.X1_l2(mean_X)
@@ -170,6 +182,20 @@ class GNN(nn.Module):
                 self.layers.append(self.act)
                 self.layers.append(layer_2_to_1(self.hidden_channels, self.out_channels))
 
+        if self.model == "ign_anydim":
+            self.linear = nn.Linear(self.in_channels, 3)
+            if self.num_layers == 1:
+                self.layers.append(layer_2_to_1_anydim(4, self.out_channels))
+            else:
+                self.layers.append(layer_2_to_2_anydim(4, self.hidden_channels))
+                for _ in range(self.num_layers - 2):
+                    self.layers.append(self.act)
+                    self.layers.append(
+                        layer_2_to_2_anydim(self.hidden_channels, self.hidden_channels)
+                    )
+                self.layers.append(self.act)
+                self.layers.append(layer_2_to_1_anydim(self.hidden_channels, self.out_channels))
+
     def forward(self, adj: Tensor, feature: Tensor) -> Tensor:
         """
         Args:
@@ -189,7 +215,7 @@ class GNN(nn.Module):
                     X = layer(X)
             return X
 
-        if self.model == "ign":
+        if self.model in ["ign", "ign_anydim"]:
             if X.dim() == 2:
                 X = X.reshape(A.shape[0], A.shape[1], -1)
             X = self.linear(X)  # N x n x 3

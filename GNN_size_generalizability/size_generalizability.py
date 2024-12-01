@@ -10,7 +10,7 @@ from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
 from train import train
-from data import DegreeDataset
+from data import HomDensityDataset
 
 
 def nrange(value: Union[str, list]) -> list:
@@ -27,11 +27,13 @@ def eval(model, params, test_n_range):
     test_loss = np.zeros(len(test_n_range))
     for i, n in tqdm(enumerate(test_n_range)):
         test_params["n_nodes"] = int(n)
-        test_dataset = DegreeDataset(
+        test_dataset = HomDensityDataset(
             root=params["data_dir"],
             N=1000,
             n=test_params["n_nodes"],
             d=params["feature_dim"],
+            graph_model=params["graph_model"],
+            task=params["task"],
         )
         test_loader = DataLoader(test_dataset, batch_size=test_params["batch_size"])
         mse = MeanSquaredError()
@@ -50,11 +52,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model", type=str, default="reduced", choices=["simple", "reduced", "unreduced", "ign"]
     )
-    parser.add_argument("--training_graph_size", type=int, default=40)
+    parser.add_argument("--graph_model", type=str, default="ER", choices=["ER", "SBM", "Sociality"])
+    parser.add_argument("--task", type=str, default="degree", choices=["degree", "triangle"])
+    parser.add_argument("--training_graph_size", type=int, default=50)
     parser.add_argument(
         "--test_n_range",
         type=nrange,
-        default="40:160:20",
+        default="50:1200:200",
         help="Range of test graph sizes",
     )
     parser.add_argument("--num_trials", type=int, default=10, help="Number of trials to run")
@@ -78,6 +82,8 @@ if __name__ == "__main__":
         "n_graphs": 5000,  # size of training dataset
         "n_nodes": args.training_graph_size,
         "test_n_range": args.test_n_range,  # range of test set sizes
+        "graph_model": args.graph_model,
+        "task": args.task,
         "feature_dim": 1,  # dimension of node features
         "data_dir": "data/",
         "val_fraction": 0.2,
@@ -101,8 +107,9 @@ if __name__ == "__main__":
         os.makedirs(params["log_dir"])
 
     # load results
+    fname = f"results_{args.graph_model}_{args.task}_{args.model}.json"
     try:
-        with open(os.path.join(params["log_dir"], f"results_{args.model}.json"), "r") as f:
+        with open(os.path.join(params["log_dir"], fname), "r") as f:
             results = json.load(f)
     except FileNotFoundError:
         results = {}
@@ -114,7 +121,7 @@ if __name__ == "__main__":
             model = train(params)
             mse = eval(model, params, args.test_n_range)
             results[args.model][str(seed)] = mse
-        with open(os.path.join(params["log_dir"], f"results_{args.model}.json"), "w") as f:
+        with open(os.path.join(params["log_dir"], fname), "w") as f:
             json.dump(results, f)
     # plot results
     log_mse_list = [np.log(results[args.model][str(seed)]) for seed in range(args.num_trials)]
@@ -132,7 +139,6 @@ if __name__ == "__main__":
     )
     plt.xlabel("Test set size (N)")
     plt.ylabel("log(Test MSE)")
-    plt.title(f'Task {params["task_id"]}')
     plt.legend()
     plt.savefig(os.path.join(params["log_dir"], f"{args.model}.png"))
     plt.close()

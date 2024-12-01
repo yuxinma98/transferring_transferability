@@ -6,6 +6,94 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+
+class layer_2_to_2_anydim(nn.Module):
+    """
+    Layer for symmetric equivariant GNNs
+    """
+
+    def __init__(self, input_depth, output_depth):
+        super().__init__()
+        self.input_depth = input_depth
+        self.output_depth = output_depth
+        self.basis_dimension = 5
+
+        # initialization values for variables
+        self.coeffs = torch.nn.Parameter(
+            torch.randn(self.input_depth, self.output_depth, self.basis_dimension)
+            * np.sqrt(2.0)
+            / (self.input_depth + self.output_depth),
+            requires_grad=True,
+        )
+        self.all_bias = torch.nn.Parameter(
+            torch.zeros(1, self.output_depth, 1, 1), requires_grad=True
+        )
+
+    def forward(self, inputs):
+        m = inputs.size(3)  # extract dimension
+        diag_part = torch.diagonal(inputs, dim1=2, dim2=3)  # N x D x m
+        mean_diag_part = torch.mean(diag_part, dim=2).unsqueeze(dim=2)  # N x D x 1
+        mean_of_cols = torch.mean(inputs, dim=2)  # N x D x m
+        mean_all = torch.mean(mean_of_cols, dim=2)  # N x D
+        # op1 - place avg of row/col i on row i + col i
+        op1 = (mean_of_cols.unsqueeze(dim=3) + mean_of_cols.unsqueeze(dim=2)) / 2  # N x D x m x m
+        op2 = inputs
+        # op3 - place ii elements on row i + col i
+        op3 = (diag_part.unsqueeze(dim=3) + diag_part.unsqueeze(dim=2)) / 2  # N x D x m x m
+        # op4 - place avg of diag in all entries
+        op4 = mean_diag_part.unsqueeze(dim=-1).expand(-1, -1, m, m)  # N x D x m x m
+        # op5 - sum of all ops - place avg of all entries in all entries
+        op5 = mean_all.unsqueeze(dim=-1).unsqueeze(dim=-1).expand(-1, -1, m, m)  # N x D x m x m
+
+        ops_out = torch.stack([op1, op2, op3, op4, op5], dim=2)
+        output = torch.einsum("dsb,ndbij->nsij", self.coeffs, ops_out)
+        output = output + self.all_bias
+        return output
+
+
+class layer_2_to_1_anydim(nn.Module):
+    """
+    Layer for symmetric equivariant GNNs
+    """
+
+    def __init__(self, input_depth, output_depth):
+        super().__init__()
+        self.input_depth = input_depth
+        self.output_depth = output_depth
+        self.basis_dimension = 5
+
+        # initialization values for variables
+        self.coeffs = torch.nn.Parameter(
+            torch.randn(self.input_depth, self.output_depth, self.basis_dimension)
+            * np.sqrt(2.0)
+            / (self.input_depth + self.output_depth),
+            requires_grad=True,
+        )
+        self.bias = torch.nn.Parameter(
+            torch.zeros(1, self.output_depth, 1, 1), requires_grad=True
+        )
+
+    def forward(self, inputs):
+        m = inputs.size(3)  # extract dimension
+        diag_part = torch.diagonal(inputs, dim1=2, dim2=3)  # N x D x m
+        mean_diag_part = torch.mean(diag_part, dim=2).unsqueeze(dim=2)  # N x D x 1
+        mean_of_cols = torch.mean(inputs, dim=2)  # N x D x m
+        mean_all = torch.mean(mean_of_cols, dim=2)  # N x D
+        # op1 - extradct diag
+        op1 = diag_part  # N x D x m
+        # op2 - avg of diag
+        op2 = mean_diag_part.expand(-1)
+        # op3 - place avg of row i on element i
+        op3 = mean_of_cols
+        # op4 - avg of all entries
+        op4 = mean_all.unsqueeze(dim=2).expand(-1, -1, m)  # N x D x m
+
+        ops_out = torch.stack([op1, op2, op3, op4], dim=2)
+        output = torch.einsum('dsb,ndbi->nsi', self.coeffs, ops_out)
+        output = output + self.bias
+        return output
+
+
 # equi_2_to_2
 class layer_2_to_2(nn.Module):
     '''

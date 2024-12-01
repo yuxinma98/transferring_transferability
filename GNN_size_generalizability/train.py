@@ -8,7 +8,7 @@ from pytorch_lightning.loggers import WandbLogger
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
 
-from data import DegreeDataset
+from data import HomDensityDataset
 from model import GNN
 
 
@@ -52,11 +52,12 @@ class GNNSizeGeneralizabilityModule(pl.LightningModule):
         self.loss = nn.MSELoss()
 
     def prepare_data(self):
-        self.dataset = DegreeDataset(
+        self.dataset = HomDensityDataset(
             root=self.params["data_dir"],
             N=self.params["n_graphs"],
             n=self.params["n_nodes"],
             d=self.params["feature_dim"],
+            **self.params
         )
         self.params["model"]["in_channels"] = self.params["feature_dim"]
         self.params["model"]["out_channels"] = 1
