@@ -6,7 +6,7 @@ import torch
 from torch_geometric.loader import DataLoader
 from typing import Union
 from data import SubsampledDataset
-from train import train, GNNTrainingModule
+from train import train
 
 
 def nrange(value: Union[str, list]) -> list:
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     )
     # GNN parameters
     parser.add_argument("--num_layers", type=int, default=3, help="Number of GNN layers")
-    parser.add_argument("--hidden_channels", type=int, default=50, help="Number of hidden channels")
+    parser.add_argument("--hidden_channels", type=int, default=5, help="Number of hidden channels")
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument("--max_epochs", type=int, default=500, help="Maximum number of epochs")
 
@@ -60,8 +60,7 @@ if __name__ == "__main__":
         "model": {
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
-            # "task": "classification",
-            "model": "unreduced",  # choice in ["simple", "reduced", "unreduced", "ign"]
+            "model": "ign",  # choice in ["simple", "reduced", "unreduced", "ign"]
         },
         # training parameters
         "lr": args.lr,

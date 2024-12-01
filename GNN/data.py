@@ -1,6 +1,5 @@
 import torch
 import os
-from tqdm import tqdm
 from torch_geometric.utils import to_dense_adj, dense_to_sparse
 from torch_geometric.data import Data
 from torch_geometric.datasets import Planetoid
@@ -8,7 +7,8 @@ from torch.utils.data import Dataset
 
 
 class SBM_GaussianDataset(Dataset):
-    def __init__(self, root, N=int(1e4), d=5, K=3):
+
+    def __init__(self, root, N=int(1e3), d=2, K=3):
         super().__init__()
         self.root = root
         self.N = N
@@ -17,7 +17,7 @@ class SBM_GaussianDataset(Dataset):
         self.prepare_data()
 
     def prepare_data(self):
-        fname = os.path.join(self.root, "Synthetic/SBM_Gaussian.pt")
+        fname = os.path.join(self.root, f"Synthetic/SBM_Gaussian_{self.N}_{self.d}_{self.K}.pt")
         if os.path.exists(fname):
             self.data = torch.load(fname)
         else:
@@ -33,6 +33,7 @@ class SBM_GaussianDataset(Dataset):
             prob_matrix = z_one_hot @ ps
             prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)
             A = torch.distributions.Bernoulli(prob_matrix).sample()
+            A = A.tril(diagonal=-1) + A.tril(diagonal=-1).transpose(-1, -2)
             X_distributions = torch.distributions.MultivariateNormal(mu[z], cov[z])
             X = X_distributions.sample()
             y = A @ torch.ones(self.N, 1) / self.N
