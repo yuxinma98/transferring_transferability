@@ -64,13 +64,12 @@ class HomDensityDataset(InMemoryDataset):
             data = Data(x=x, edge_index=edge_index, A=A)
 
             if self.task == "degree":
-                y = pyg_utils.degree(edge_index[0]).unsqueeze(0) / n  # 1 x n
+                data.y = pyg_utils.degree(edge_index[0]).sum().unsqueeze(0) / (n**2)
             elif self.task == "triangle":
                 A = A.squeeze()
-                triangles = (A @ A @ A).diag()
-                y = triangles.unsqueeze(0) / (n**2)  # 1 x n
+                triangles = (A @ A @ A).diag().sum() / 6
+                data.y = triangles / (n**3)  # 1 x n
 
-            data.y = y
             data_list.append(data)
 
         data, slices = self.collate(data_list)

@@ -2,7 +2,7 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from torch import Tensor
-from ign_layers import layer_2_to_2, layer_2_to_1
+from ign_layers import layer_2_to_2, layer_2_to_1, layer_2_to_2_anydim, layer_2_to_1_anydim
 
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
@@ -138,7 +138,6 @@ class GNN(nn.Module):
         self.num_layers = num_layers
         self.out_channels = out_channels
         self.act = act
-        assert model in ["simple", "reduced", "unreduced", "ign"]
         self.model = model
         if kwargs:
             for key, value in kwargs.items():
@@ -213,6 +212,7 @@ class GNN(nn.Module):
                     A, X = layer(A, X)
                 else:
                     X = layer(X)
+            X = X.mean(dim=-2)
             return X
 
         if self.model in ["ign", "ign_anydim"]:
@@ -224,4 +224,5 @@ class GNN(nn.Module):
             X = torch.cat([A, X], dim=1)  # N x 4 x n x n
             for layer in self.layers:
                 X = layer(X)
-            return X.transpose(-1, -2)
+            X = X.mean(dim=-1)
+            return X
