@@ -4,7 +4,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 import torch_geometric as pyg
 import torchmetrics
-from torch_geometric.datasets import planetoid
+from torch_geometric.datasets import planetoid, SNAPDataset
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
@@ -61,13 +61,30 @@ class GNNTrainingModule(pl.LightningModule):
         elif self.params["dataset"] == "SBM_Gaussian":
             dataset = SBM_GaussianDataset(root="data/")
             self.task = "regression"
+        elif self.params["dataset"] == "facebook":
+            dataset = SNAPDataset(root="data/", name="ego-facebook")
+            self.task = "regression"
         data = dataset[0]
-        data.A = pyg.utils.to_dense_adj(data.edge_index)
-        self.data = data
+        if self.params["dataset"] != "SBM_Gaussian":
+            data.A = pyg.utils.to_dense_adj(data.edge_index)
         self.params["model"]["in_channels"] = data.x.shape[-1]
         self.params["model"]["out_channels"] = (
             dataset.num_classes if self.task == "classification" else 1
         )
+        if (
+            self.params["dataset"] == "facebook"
+        ):  # facebook dataset does not have target y or train/val/test masks
+            A = data.A.squeeze()
+            triangles = (A @ A @ A).diag()
+            data.y = triangles / (A.shape[-1] ** 2)  # 1 x n
+            data.train_mask = torch.zeros_like(data.y, dtype=torch.bool)
+            data.val_mask = torch.zeros_like(data.y, dtype=torch.bool)
+            data.test_mask = torch.zeros_like(data.y, dtype=torch.bool)
+            data.train_mask[: int(0.8 * data.y.shape[0])] = True
+            data.val_mask[int(0.8 * data.y.shape[0]) : int(0.9 * data.y.shape[0])] = True
+            data.test_mask[int(0.9 * data.y.shape[0]) :] = True
+
+        self.data = data
         self.model = GNN(**self.params["model"])
 
         if self.task == "classification":

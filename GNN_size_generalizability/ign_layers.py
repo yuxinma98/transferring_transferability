@@ -60,7 +60,7 @@ class layer_2_to_1_anydim(nn.Module):
         super().__init__()
         self.input_depth = input_depth
         self.output_depth = output_depth
-        self.basis_dimension = 5
+        self.basis_dimension = 4
 
         # initialization values for variables
         self.coeffs = torch.nn.Parameter(
@@ -69,9 +69,7 @@ class layer_2_to_1_anydim(nn.Module):
             / (self.input_depth + self.output_depth),
             requires_grad=True,
         )
-        self.bias = torch.nn.Parameter(
-            torch.zeros(1, self.output_depth, 1, 1), requires_grad=True
-        )
+        self.bias = torch.nn.Parameter(torch.zeros(1, self.output_depth, 1), requires_grad=True)
 
     def forward(self, inputs):
         m = inputs.size(3)  # extract dimension
@@ -82,7 +80,7 @@ class layer_2_to_1_anydim(nn.Module):
         # op1 - extradct diag
         op1 = diag_part  # N x D x m
         # op2 - avg of diag
-        op2 = mean_diag_part.expand(-1)
+        op2 = mean_diag_part.expand(-1, -1, m)
         # op3 - place avg of row i on element i
         op3 = mean_of_cols
         # op4 - avg of all entries

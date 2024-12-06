@@ -23,7 +23,7 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="Cora",
-        choices=["Cora", "PubMed", "SBM_Gaussian"],
+        choices=["Cora", "PubMed", "SBM_Gaussian", "facebook"],
         help="Dataset to use",
     )
     parser.add_argument(
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         "model": {
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
-            "model": "ign",  # choice in ["simple", "reduced", "unreduced", "ign"]
+            "model": "simple",  # choice in ["simple", "reduced", "unreduced", "ign", "ign_anydim"]
         },
         # training parameters
         "lr": args.lr,
@@ -72,24 +72,15 @@ if __name__ == "__main__":
 
     # train model
     model = train(params)
-    # model = GNNTrainingModule(params)
     model.eval()
-
-    # transferability experiment
-    # subsampled_data = SubsampledDataset(
-    #     "data/", model, args.dataset, args.n_samples, args.reference_graph_size
-    # )
-    # test_loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
-    # with torch.no_grad():
-    #     reference_out = []
-    #     for batch in test_loader:
-    #         out = model(batch).detach()  # batch_size x n x D_out
-    #         projected_out = out[
-    #             torch.arange(out.shape[0]).unsqueeze(-1), batch.indices, :
-    #         ]  # batch_size x N x D_out
-    #         reference_out.append(projected_out)
-    #     reference_out = torch.cat(reference_out, dim=0)  # n_samples x N x D_out
-    # reference_out = reference_out.mean(dim=0)  # N x D_out
+    subsampled_data = SubsampledDataset("data/", model, args.dataset, 1, args.reference_graph_size)[
+        0
+    ]
+    with torch.no_grad():
+        reference_out = []
+        out = model(subsampled_data).detach()  # 1 x m x D_out
+        reference_out = out[subsampled_data.indices.squeeze(), :]  # 1 x N x D_out
+    reference_out = reference_out.squeeze(dim=0)  # N x D_out
 
     n_range = np.power(10, args.log_n_range).astype(int)
     errors_mean = np.zeros_like(n_range, dtype=float)
@@ -100,7 +91,6 @@ if __name__ == "__main__":
         test_loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
         # compute GNN output on subsampled graphs
         errors = []
-        target = subsampled_data.target  # N x D_out
         with torch.no_grad():
             for batch in test_loader:
                 out = model(batch).detach()  # batch_size x n x D_out
@@ -108,9 +98,9 @@ if __name__ == "__main__":
                     torch.arange(out.shape[0]).unsqueeze(-1), batch.indices, :
                 ]  # batch_size x N x D_out
                 errors.append(
-                    torch.norm(projected_out - target, p=2, dim=1) / np.sqrt(subsampled_data.n)
+                    torch.norm(projected_out - reference_out, p=2, dim=1)
+                    / np.sqrt(subsampled_data.n)
                 )
-                print(target.max(), target.min(), projected_out.max(), projected_out.min())
         errors = torch.cat(errors, dim=0)  # n_samples x D_out
         errors = errors.max(dim=1)[0]  # n_samples
         errors_mean[i] = errors.mean().item()
