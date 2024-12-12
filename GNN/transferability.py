@@ -33,15 +33,12 @@ if __name__ == "__main__":
         help="In the transferability experiment, for each graph size n, how many samples to generate from the step graphon",
     )
     parser.add_argument(
-        "--reference_graph_size", type=int, default=int(1e4), help="Reference graph size"
-    )
-    parser.add_argument(
         "--log_n_range", type=nrange, default="1:2.6:0.2", help="Range of log n to consider"
     )
     # GNN parameters
     parser.add_argument("--num_layers", type=int, default=3, help="Number of GNN layers")
     parser.add_argument("--hidden_channels", type=int, default=5, help="Number of hidden channels")
-    parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--max_epochs", type=int, default=500, help="Maximum number of epochs")
 
     args = parser.parse_args()
@@ -60,7 +57,7 @@ if __name__ == "__main__":
         "model": {
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
-            "model": "simple",  # choice in ["simple", "reduced", "unreduced", "ign", "ign_anydim"]
+            "model": "ign_anydim",  # choice in ["simple", "reduced", "unreduced", "ign", "ign_anydim"]
         },
         # training parameters
         "lr": args.lr,
@@ -73,14 +70,6 @@ if __name__ == "__main__":
     # train model
     model = train(params)
     model.eval()
-    subsampled_data = SubsampledDataset("data/", model, args.dataset, 1, args.reference_graph_size)[
-        0
-    ]
-    with torch.no_grad():
-        reference_out = []
-        out = model(subsampled_data).detach()  # 1 x m x D_out
-        reference_out = out[subsampled_data.indices.squeeze(), :]  # 1 x N x D_out
-    reference_out = reference_out.squeeze(dim=0)  # N x D_out
 
     n_range = np.power(10, args.log_n_range).astype(int)
     errors_mean = np.zeros_like(n_range, dtype=float)
@@ -98,7 +87,7 @@ if __name__ == "__main__":
                     torch.arange(out.shape[0]).unsqueeze(-1), batch.indices, :
                 ]  # batch_size x N x D_out
                 errors.append(
-                    torch.norm(projected_out - reference_out, p=2, dim=1)
+                    torch.norm(projected_out - subsampled_data.target, p=2, dim=1)
                     / np.sqrt(subsampled_data.n)
                 )
         errors = torch.cat(errors, dim=0)  # n_samples x D_out
@@ -108,13 +97,11 @@ if __name__ == "__main__":
 
     # plot and log transferability results
     plt.figure()
-    plt.errorbar(
-        n_range, errors_mean, errors_std, fmt="o", capsize=3, markersize=5, label="Reduced model"
-    )
+    plt.errorbar(n_range, errors_mean, errors_std, fmt="o", capsize=3, markersize=5)
     y = n_range ** (-0.5) * n_range[0] ** (0.5) * errors_mean[0]
     plt.plot(n_range, y, label="$n^{-1/2}$")
     plt.xlabel("Set size $n$")
-    plt.ylabel("$\max_j \|f_n(A_n,X_n)_{:j} - f_m(A,X)_{:j}\|_2$")
+    plt.ylabel("$\max_j \|f_n(A_n,X_n)_{:j} - f_N(A,X)_{:j}\|_2$")
     plt.legend()
     plt.xscale("log")
     plt.yscale("log")
