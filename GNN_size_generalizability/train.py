@@ -7,6 +7,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
+import torch_geometric.utils as pyg_utils
 
 from data import HomDensityDataset
 from model import GNN
@@ -59,7 +60,11 @@ class GNNSizeGeneralizabilityModule(pl.LightningModule):
             d=self.params["feature_dim"],
             **self.params
         )
-        self.params["model"]["in_channels"] = self.params["feature_dim"]
+        self.params["model"]["in_channels"] = (
+            self.params["feature_dim"] + 1
+            if self.params["task"] == "conditional_triangle"
+            else self.params["feature_dim"]
+        )
         self.params["model"]["out_channels"] = 1
         self.model = GNN(**self.params["model"])
 
@@ -85,7 +90,9 @@ class GNNSizeGeneralizabilityModule(pl.LightningModule):
         return DataLoader(self.test_dataset, batch_size=self.params["batch_size"])
 
     def forward(self, data):
-        return self.model(data.A, data.x).squeeze()
+        A = pyg_utils.to_dense_adj(data.edge_index, batch=data.batch)
+        x, mask = pyg_utils.to_dense_batch(data.x, batch=data.batch)
+        return self.model(A, x).reshape(-1)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(

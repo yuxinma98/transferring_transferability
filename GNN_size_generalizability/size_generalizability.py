@@ -5,7 +5,6 @@ from typing import Union
 import json
 import matplotlib.pyplot as plt
 import torch
-from torchmetrics import MeanSquaredError
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
@@ -36,13 +35,13 @@ def eval(model, params, test_n_range):
             task=params["task"],
         )
         test_loader = DataLoader(test_dataset, batch_size=test_params["batch_size"])
-        mse = MeanSquaredError()
         with torch.no_grad():
             for batch in test_loader:
                 out = model(batch)
-                loss = mse(out, batch.y)
-                test_loss[i] += loss.item() * len(batch)
-        test_loss[i] /= len(test_dataset)
+                batch.y[batch.y == 0] = 1e-9  # avoid division by zero
+                relative_error = abs(out - batch.y) / (batch.y)  # dim: (batch_size * n)
+                test_loss[i] += relative_error.sum().item()
+        test_loss[i] /= len(test_dataset) * n
     return test_loss.tolist()
 
 
@@ -50,21 +49,29 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment set-ups
     parser.add_argument(
-        "--model", type=str, default="reduced", choices=["simple", "reduced", "unreduced", "ign"]
+        "--model",
+        type=str,
+        default="reduced",
+        choices=["simple", "reduced", "unreduced", "ign", "ign_anydim"],
     )
     parser.add_argument("--graph_model", type=str, default="ER", choices=["ER", "SBM", "Sociality"])
-    parser.add_argument("--task", type=str, default="degree", choices=["degree", "triangle"])
+    parser.add_argument(
+        "--task",
+        type=str,
+        default="degree",
+        choices=["degree", "triangle", "4-cycle", "conditional_triangle"],
+    )
     parser.add_argument("--training_graph_size", type=int, default=50)
     parser.add_argument(
-        "--test_n_range",
+        "--log_test_n_range",
         type=nrange,
-        default="50:1200:200",
+        default="1.7:3.4:0.4",
         help="Range of test graph sizes",
     )
     parser.add_argument("--num_trials", type=int, default=10, help="Number of trials to run")
 
     # GNN parameters
-    parser.add_argument("--num_layers", type=int, default=3, help="Number of GNN layers")
+    parser.add_argument("--num_layers", type=int, default=5, help="Number of GNN layers")
     parser.add_argument("--hidden_channels", type=int, default=5, help="Number of hidden channels")
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument("--max_epochs", type=int, default=500, help="Maximum number of epochs")
@@ -81,7 +88,6 @@ if __name__ == "__main__":
         # data parameters
         "n_graphs": 5000,  # size of training dataset
         "n_nodes": args.training_graph_size,
-        "test_n_range": args.test_n_range,  # range of test set sizes
         "graph_model": args.graph_model,
         "task": args.task,
         "feature_dim": 1,  # dimension of node features
@@ -105,6 +111,7 @@ if __name__ == "__main__":
     }
     if not os.path.exists(params["log_dir"]):
         os.makedirs(params["log_dir"])
+    test_n_range = np.power(10, args.log_test_n_range).astype(int)
 
     # load results
     fname = f"results_{args.graph_model}_{args.task}_{args.model}.json"
@@ -119,7 +126,7 @@ if __name__ == "__main__":
         if str(seed) not in results[args.model]:  # skip if already done
             params["training_seed"] = seed
             model = train(params)
-            mse = eval(model, params, args.test_n_range)
+            mse = eval(model, params, test_n_range)
             results[args.model][str(seed)] = mse
         with open(os.path.join(params["log_dir"], fname), "w") as f:
             json.dump(results, f)
@@ -129,16 +136,16 @@ if __name__ == "__main__":
     std_mse = np.std(log_mse_list, axis=0)
 
     plt.figure()
-    x = np.array(args.test_n_range)
-    plt.plot(x, mean_mse, label="Normalized")
+    x = np.array(test_n_range)
+    plt.plot(x, mean_mse)
     plt.fill_between(
         x,
         mean_mse - std_mse,
         mean_mse + std_mse,
         alpha=0.3,
     )
+    plt.xscale("log")
     plt.xlabel("Test set size (N)")
     plt.ylabel("log(Test MSE)")
-    plt.legend()
     plt.savefig(os.path.join(params["log_dir"], f"{args.model}.png"))
     plt.close()

@@ -40,7 +40,7 @@ class HomDensityDataset(InMemoryDataset):
                 else:
                     p = random.uniform(self.p[0], self.p[1])
                 edge_index = pyg_utils.erdos_renyi_graph(n, p)
-                A = pyg_utils.to_dense_adj(edge_index)
+                A = pyg_utils.to_dense_adj(edge_index).squeeze()
             elif self.graph_model == "SBM":
                 z = torch.randint(0, 3, (n,))
                 z_one_hot = torch.nn.functional.one_hot(z, num_classes=3).float()
@@ -48,29 +48,27 @@ class HomDensityDataset(InMemoryDataset):
                 prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)
                 A = torch.distributions.Bernoulli(prob_matrix).sample()
                 A = A.tril(diagonal=-1) + A.tril(diagonal=-1).transpose(-1, -2)
-                A = A.unsqueeze(0)  # 1 x n x n
-                edge_index = pyg_utils.dense_to_sparse(A)[0]
+                edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
             elif self.graph_model == "Sociality":
                 uniform_sampler = torch.distributions.Uniform(0, 1)
                 z = uniform_sampler.sample((n,))
-                # a = random.uniform(0.3, 0.7)
                 prob_matrix = self.kernel(z.unsqueeze(1), z.unsqueeze(0))
                 A = torch.distributions.Bernoulli(prob_matrix).sample()
                 A = A.tril(diagonal=-1) + A.tril(diagonal=-1).transpose(-1, -2)
-                A = A.unsqueeze(0)
-                edge_index = pyg_utils.dense_to_sparse(A)[0]
+                edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
 
-            x = torch.randn((n, self.d)).unsqueeze(0)  # Random node features, 1 x n x d
-            data = Data(x=x, edge_index=edge_index, A=A)
+            x = torch.randn((n, self.d))  # Random node features, n x d
 
             if self.task == "degree":
-                y = pyg_utils.degree(edge_index[0]).unsqueeze(0) / n  # 1 x n
-            elif self.task == "triangle":
-                A = A.squeeze()
-                triangles = (A @ A @ A).diag()
-                y = triangles.unsqueeze(0) / (n**2)  # 1 x n
+                y = pyg_utils.degree(edge_index[0]) / n
+            elif self.task == "triangle" or self.task == "conditional_triangle":
+                mask = z < 0.3
+                A[mask, :][:, mask] = 0
+                y = (A @ A @ A).diag() / (n**2)
+            elif self.task == "4-cycle":
+                y = (A @ A @ A @ A).diag() / (n**3)
 
-            data.y = y
+            data = Data(x=torch.concat([x, z.unsqueeze(-1)], dim=1), edge_index=edge_index, y=y)
             data_list.append(data)
 
         data, slices = self.collate(data_list)

@@ -2,7 +2,7 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from torch import Tensor
-from ign_layers import layer_2_to_2, layer_2_to_1
+from ign_layers import layer_2_to_2, layer_2_to_1, layer_2_to_1_anydim, layer_2_to_2_anydim
 
 class GNN_layer(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, reduced: bool = False) -> None:
@@ -12,6 +12,8 @@ class GNN_layer(nn.Module):
         self.reduced = reduced
 
         # Initialize parameters
+        # total number of parameters: 5 + 2 * D1 + 4 * D1 * D2 + 8 * D2
+        # if reduced: 3 + 2 * D1 + 4 * D1 * D2 + 4 * D2
         self.A_coeffs = nn.Parameter(torch.randn(5), requires_grad=True)
         self.A_l1, self.A_l2 = nn.ModuleList(
             [nn.Linear(in_channels, 1, bias=False) for _ in range(2)]
@@ -138,7 +140,6 @@ class GNN(nn.Module):
         self.num_layers = num_layers
         self.out_channels = out_channels
         self.act = act
-        assert model in ["simple", "reduced", "unreduced", "ign"]
         self.model = model
         if kwargs:
             for key, value in kwargs.items():
@@ -171,11 +172,10 @@ class GNN(nn.Module):
                 self.layers.append(nn_layer(self.hidden_channels, self.out_channels, reduced))
 
         if self.model == "ign":
-            self.linear = nn.Linear(self.in_channels, 3)
             if self.num_layers == 1:
-                self.layers.append(layer_2_to_1(4, self.out_channels))
+                self.layers.append(layer_2_to_1(self.in_channels + 1, self.out_channels))
             else:
-                self.layers.append(layer_2_to_2(4, self.hidden_channels))
+                self.layers.append(layer_2_to_2(self.in_channels + 1, self.hidden_channels))
                 for _ in range(self.num_layers - 2):
                     self.layers.append(self.act)
                     self.layers.append(layer_2_to_2(self.hidden_channels, self.hidden_channels))
@@ -183,11 +183,10 @@ class GNN(nn.Module):
                 self.layers.append(layer_2_to_1(self.hidden_channels, self.out_channels))
 
         if self.model == "ign_anydim":
-            self.linear = nn.Linear(self.in_channels, 3)
             if self.num_layers == 1:
-                self.layers.append(layer_2_to_1_anydim(4, self.out_channels))
+                self.layers.append(layer_2_to_1_anydim(self.in_channels + 1, self.out_channels))
             else:
-                self.layers.append(layer_2_to_2_anydim(4, self.hidden_channels))
+                self.layers.append(layer_2_to_2_anydim(self.in_channels + 1, self.hidden_channels))
                 for _ in range(self.num_layers - 2):
                     self.layers.append(self.act)
                     self.layers.append(
@@ -218,10 +217,9 @@ class GNN(nn.Module):
         if self.model in ["ign", "ign_anydim"]:
             if X.dim() == 2:
                 X = X.reshape(A.shape[0], A.shape[1], -1)
-            X = self.linear(X)  # N x n x 3
-            X = torch.diag_embed(X.transpose(-1, -2))  # N x 3 x n x n
+            X = torch.diag_embed(X.transpose(-1, -2))  # N x d x n x n
             A = A.unsqueeze(dim=1)  # N x 1 x n x n
-            X = torch.cat([A, X], dim=1)  # N x 4 x n x n
+            X = torch.cat([A, X], dim=1)  # N x (d+1) x n x n
             for layer in self.layers:
                 X = layer(X)
             return X.transpose(-1, -2)
