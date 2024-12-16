@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # GNN parameters
     parser.add_argument("--num_layers", type=int, default=5, help="Number of GNN layers")
     parser.add_argument("--hidden_channels", type=int, default=5, help="Number of hidden channels")
-    parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--max_epochs", type=int, default=500, help="Maximum number of epochs")
 
     args = parser.parse_args()
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         "project": "anydim_transferability",  # wandb project name
         "name": "GNN_size_generalizability",  # wandb run name
         "logger": True,  # whether to use wandb to log
-        "log_checkpoint": False,  # whether to log model checkpoint in wandb
+        "log_checkpoint": True,  # whether to log model checkpoint in wandb
         "log_model": None,  # whether to log gradient/parameters in wandb
         "log_dir": "log/size_generalizability",  # directory to save logs
         # data parameters
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         "graph_model": args.graph_model,
         "task": args.task,
         "feature_dim": 1,  # dimension of node features
-        "data_dir": "data/",
+        "data_dir": "/export/canton/data/yma93/anydim_transferability/GNN_size_generalizability/",
         "val_fraction": 0.2,
         "test_fraction": 0.2,
         "batch_size": 128,
