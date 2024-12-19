@@ -24,7 +24,7 @@ class GNN_layer(nn.Module):
         self.A_l6, self.A_l7 = nn.ModuleList(
             [nn.Linear(x_in_channels, A_out_channels, bias=False) for _ in range(2)]
         )
-        self.A_bias = nn.Parameter(torch.zeros(1, 1, 1, A_out_channels))
+        # self.A_bias = nn.Parameter(torch.zeros(1, 1, 1, A_out_channels))
 
         self.X1_l1, self.X1_l2 = nn.ModuleList(
             [nn.Linear(x_in_channels, x_out_channels, bias=False) for _ in range(2)]
@@ -38,9 +38,9 @@ class GNN_layer(nn.Module):
         self.X2_l3, self.X2_l4, self.X2_l5, self.X2_l6 = nn.ModuleList(
             [nn.Linear(A_in_channels, x_out_channels, bias=False) for _ in range(4)]
         )
-        self.X1_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
-        self.X2_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
-        self.out_transform = nn.Linear(A_out_channels * x_out_channels, x_out_channels)
+        # self.X1_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
+        # self.X2_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
+        self.out_transform = nn.Linear(A_out_channels * x_out_channels, x_out_channels, bias=False)
 
     def forward(self, A: Tensor, X: Tensor) -> Tensor:
         """
@@ -70,21 +70,19 @@ class GNN_layer(nn.Module):
 
         A_transform = self.A_l1(A.permute(0, 2, 3, 1))  # N, n, n, A_out
         A_transform += self.A_l2(mean_all)  # N, 1, 1, A_out
-        A_transform += self.A_l3((mean_of_cols + mean_of_cols.transpose(-2, -3)))  # N, n, n, A_out
-        A_transform += self.A_l6(X.unsqueeze(dim=-2)) + self.A_l6(
-            X.unsqueeze(dim=-3)
-        )  # N, n, n, A_out
+        A_transform += self.A_l4((mean_of_cols + mean_of_cols.transpose(-2, -3)))  # N, n, n, A_out
+        A_transform += self.A_l6(X.unsqueeze(dim=-2) + X.unsqueeze(dim=-3))  # N, n, n, A_out
         A_transform += self.A_l7(mean_X.unsqueeze(1))  # N, 1, 1, A_out
-        A_transform += self.A_bias
+        # A_transform += self.A_bias
         if not self.reduced:
-            A_transform += self.A_l4(mean_diag_part)  # N, 1, 1, A_out
+            A_transform += self.A_l3(mean_diag_part)  # N, 1, 1, A_out
             A_transform += self.A_l5(diag_part + diag_part.transpose(-2, -3))  # N, n, n, A_out
 
         X1_transform = self.X1_l1(X)  # N, n, x_out
         X1_transform += self.X1_l2(mean_X)  # N, 1, x_out
         X1_transform += self.X1_l3(mean_of_cols.squeeze(dim=-2))  # N, n, x_out
         X1_transform += self.X1_l6(mean_all.squeeze(dim=1))  # N, 1, x_out
-        X1_transform += self.X1_bias  # 1, 1, x_out
+        # X1_transform += self.X1_bias  # 1, 1, x_out
         if not self.reduced:
             X1_transform += self.X1_l4(diag_part.squeeze(dim=-2))  # N, n, x_out
             X1_transform += self.X1_l5(mean_diag_part.squeeze(dim=-2))  # N, 1, x_out
@@ -93,11 +91,10 @@ class GNN_layer(nn.Module):
         X2_transform += self.X2_l2(mean_X)
         X2_transform += self.X2_l3(mean_of_cols.squeeze(dim=-2))
         X2_transform += self.X2_l6(mean_all.squeeze(dim=1))
-        X2_transform += self.X2_bias
+        # X2_transform += self.X2_bias
         if not self.reduced:
             X2_transform += self.X2_l4(diag_part.squeeze(dim=-2))
             X2_transform += self.X2_l5(mean_diag_part.squeeze(dim=-2))
-
         out = torch.einsum("nijs, njt -> nist", A_transform, X2_transform) / n  # N, n, A_out, x_out
         out = out.reshape(out.shape[0], out.shape[1], -1)  # N, n, A_out * x_out
         out = self.out_transform(out)  # N, n, x_out
