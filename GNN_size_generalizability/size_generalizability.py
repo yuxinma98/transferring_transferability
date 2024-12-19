@@ -54,7 +54,9 @@ if __name__ == "__main__":
         default="reduced",
         choices=["simple", "reduced", "unreduced", "ign", "ign_anydim"],
     )
-    parser.add_argument("--graph_model", type=str, default="ER", choices=["ER", "SBM", "Sociality"])
+    parser.add_argument(
+        "--graph_model", type=str, default="ER", choices=["ER", "SBM", "Sociality", "spiked"]
+    )
     parser.add_argument(
         "--task",
         type=str,

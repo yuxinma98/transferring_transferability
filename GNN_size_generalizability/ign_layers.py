@@ -47,7 +47,7 @@ class layer_2_to_2_anydim(nn.Module):
 
         ops_out = torch.stack([op1, op2, op3, op4, op5], dim=2)
         output = torch.einsum("dsb,ndbij->nsij", self.coeffs, ops_out)
-        output = output + self.all_bias
+        # output = output + self.all_bias
         return output
 
 
@@ -88,7 +88,7 @@ class layer_2_to_1_anydim(nn.Module):
 
         ops_out = torch.stack([op1, op2, op3, op4], dim=2)
         output = torch.einsum('dsb,ndbi->nsi', self.coeffs, ops_out)
-        output = output + self.bias
+        # output = output + self.bias
         return output
 
 

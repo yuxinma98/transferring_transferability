@@ -18,6 +18,8 @@ class HomDensityDataset(InMemoryDataset):
             self.ps = torch.tensor([[0.8, 0.15, 0.05], [0.15, 0.7, 0.25], [0.05, 0.25, 0.9]])
         elif self.graph_model == "Sociality":
             self.kernel = lambda x, y: 1 / (1 + torch.exp(-x * y))
+        elif self.graph_model == "spiked":
+            self.kernel = lambda x, y: torch.exp(-0.3 * (x - y) ** 2)
         super(HomDensityDataset, self).__init__(root=root, transform=None, pre_transform=None)
         self.data, self.slices = self.process()
 
@@ -49,7 +51,7 @@ class HomDensityDataset(InMemoryDataset):
                 A = torch.distributions.Bernoulli(prob_matrix).sample()
                 A = A.tril(diagonal=-1) + A.tril(diagonal=-1).transpose(-1, -2)
                 edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
-            elif self.graph_model == "Sociality":
+            elif self.graph_model == "Sociality" or self.graph_model == "spiked":
                 uniform_sampler = torch.distributions.Uniform(0, 1)
                 z = uniform_sampler.sample((n,))
                 prob_matrix = self.kernel(z.unsqueeze(1), z.unsqueeze(0))
