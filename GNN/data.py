@@ -53,7 +53,7 @@ class SBM_GaussianDataset(Dataset):
             prob_matrix = z_one_hot @ ps
             prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)  # N x N
             A = torch.distributions.Bernoulli(prob_matrix).sample()
-            A = A.tril(diagonal=-1) + A.tril(diagonal=-1).transpose(-1, -2)  # make A symmetric
+            A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)  # make A symmetric
 
             # Generate features
             X_distributions = torch.distributions.MultivariateNormal(mu[z], cov[z])
@@ -72,7 +72,7 @@ class SBM_GaussianDataset(Dataset):
             test_mask[int(0.9 * self.N) :] = True
 
             self.data = Data(
-                x=X,
+                x=X.unsqueeze(0),
                 edge_index=dense_to_sparse(A)[0],
                 A=A.unsqueeze(0),
                 y=y,
@@ -128,36 +128,33 @@ class SubsampledDataset(Dataset):
             data.A = to_dense_adj(data.edge_index)
 
         with torch.no_grad():
-            target = model(data).detach()
-        degree = data.A.sum(-1)
-        rank = torch.argsort(degree).squeeze()
+            self.target = model(data).detach()
         # use the ordered adjacency matrix as graph signal as step graphon to sample from
-        self.W = data.A[:, rank, :][:, :, rank]
-        self.f = data.x[rank, :]
-        self.target = target[rank, :]
-        self.n = self.W.shape[-1]
+        self.W = data.A
+        self.f = data.x
+        self.N = self.W.shape[-1]
 
     def __len__(self):
         return self.n_samples
 
     def __getitem__(self, idx):
         # Sample n_nodes nodes with replacement
-        z = torch.randint(0, self.n, (self.n_nodes,))
-        # Sort the sampled nodes
-        z = z[torch.argsort(z)]
+        z = torch.randint(0, self.N, (self.n_nodes,))
+        # # Sort the sampled nodes
+        # z = z[torch.argsort(z)]
 
-        # for each original node (1-n), find the closest node in the sampled nodes
-        index = torch.arange(self.n)
-        z_expanded = z.unsqueeze(0).expand(self.n, -1)  # n x n_nodes
-        index_expanded = index.unsqueeze(1).expand(-1, self.n_nodes)  # n x n_nodes
-        distances = torch.abs(index_expanded - z_expanded)
-        closest_indices = torch.argmin(distances, dim=1).unsqueeze(0)  # 1 x n
+        # # for each original node (1-N), find the closest node in the sampled nodes
+        # index = torch.arange(self.N)
+        # z_expanded = z.unsqueeze(0).expand(self.N, -1)  # n x n_nodes
+        # index_expanded = index.unsqueeze(1).expand(-1, self.n_nodes)  # n x n_nodes
+        # distances = torch.abs(index_expanded - z_expanded)
+        # closest_indices = torch.argmin(distances, dim=1).unsqueeze(0)  # 1 x n
 
         # Construct one subsampled graph data
         data = Data(
-            x=self.f[z, :],
+            x=self.f[:, z, :],
             edge_index=dense_to_sparse(self.W[:, z, :][:, :, z])[0],
             A=self.W[:, z, :][:, :, z],
-            indices=closest_indices,  # record how to map back to the graphon
+            # indices=closest_indices,  # record how to map back to the graphon
         )
         return data

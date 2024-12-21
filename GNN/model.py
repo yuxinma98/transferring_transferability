@@ -55,8 +55,6 @@ class GNN_layer(nn.Module):
         if A.dim() == 3:
             A = A.unsqueeze(dim=1)
         assert A.dim() == 4 and A.shape[-1] == A.shape[-2], "A must be of shape  N, A_in, n, n"
-        if X.dim() == 2:
-            X = X.unsqueeze(dim=-1)
         assert (
             X.dim() == 3 and X.shape[0] == A.shape[0] and X.shape[-2] == A.shape[-1]
         ), "X must be of shape N, n, x_in"

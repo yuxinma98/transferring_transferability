@@ -53,16 +53,16 @@ class GNNTrainingModule(pl.LightningModule):
 
     def prepare_data(self):
         if self.params["dataset"] == "Cora":
-            dataset = planetoid.Planetoid(root="data/", name="Cora", split="full")
+            dataset = planetoid.Planetoid(root=self.params["data_dir"], name="Cora", split="full")
             self.task = "classification"
         elif self.params["dataset"] == "PubMed":
-            dataset = planetoid.Planetoid(root="data/", name="PubMed", split="full")
+            dataset = planetoid.Planetoid(root=self.params["data_dir"], name="PubMed", split="full")
             self.task = "classification"
         elif self.params["dataset"] == "SBM_Gaussian":
-            dataset = SBM_GaussianDataset(root="data/")
+            dataset = SBM_GaussianDataset(root=self.params["data_dir"], N=5000)
             self.task = "regression"
         elif self.params["dataset"] == "facebook":
-            dataset = SNAPDataset(root="data/", name="ego-facebook")
+            dataset = SNAPDataset(root=self.params["data_dir"], name="ego-facebook")
             self.task = "regression"
         data = dataset[0]
         if self.params["dataset"] != "SBM_Gaussian":
