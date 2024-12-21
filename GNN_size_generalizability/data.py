@@ -56,7 +56,7 @@ class HomDensityDataset(InMemoryDataset):
                 z = uniform_sampler.sample((n,))
                 prob_matrix = self.kernel(z.unsqueeze(1), z.unsqueeze(0))
                 A = torch.distributions.Bernoulli(prob_matrix).sample()
-                A = A.tril(diagonal=-1) + A.tril(diagonal=-1).transpose(-1, -2)
+                A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
                 edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
 
             x = torch.randn((n, self.d))  # Random node features, n x d
@@ -70,7 +70,7 @@ class HomDensityDataset(InMemoryDataset):
             elif self.task == "4-cycle":
                 y = (A @ A @ A @ A).diag() / (n**3)
 
-            data = Data(x=torch.concat([x, z.unsqueeze(-1)], dim=1), edge_index=edge_index, y=y)
+            data = Data(x=z.unsqueeze(-1), edge_index=edge_index, y=y)
             data_list.append(data)
 
         data, slices = self.collate(data_list)
