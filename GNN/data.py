@@ -98,6 +98,7 @@ class SubsampledDataset(Dataset):
         dataset_name: str,
         n_samples: int,
         n_nodes: int,
+        **kwargs,
     ) -> None:
         """Subsampled dataset for transferability experiment.
 
@@ -120,7 +121,9 @@ class SubsampledDataset(Dataset):
         elif dataset_name == "facebook":
             data = SNAPDataset(root, "ego-facebook")[0]
         elif dataset_name == "SBM_Gaussian":
-            data = SBM_GaussianDataset(root)[0]
+            data = SBM_GaussianDataset(
+                root, N=kwargs.get("N"), d=kwargs.get("d"), K=kwargs.get("K")
+            )[0]
         else:
             raise ValueError(f"Dataset {self.dataset_name} is not supported.")
 
@@ -129,32 +132,28 @@ class SubsampledDataset(Dataset):
 
         with torch.no_grad():
             self.target = model(data).detach()
-        # use the ordered adjacency matrix as graph signal as step graphon to sample from
         self.W = data.A
         self.f = data.x
         self.N = self.W.shape[-1]
+
+        self.generate_dataset()
+
+    def subsample_data(self):
+        z = torch.randint(0, self.N, (self.n_nodes,))
+        return Data(
+            x=self.f[:, z, :],
+            edge_index=dense_to_sparse(self.W[:, z, :][:, :, z])[0],
+            A=self.W[:, z, :][:, :, z],
+        )
+
+    def generate_dataset(self):
+        self.dataset = []
+        for _ in range(self.n_samples):
+            sample = self.subsample_data()
+            self.dataset.append(sample)
 
     def __len__(self):
         return self.n_samples
 
     def __getitem__(self, idx):
-        # Sample n_nodes nodes with replacement
-        z = torch.randint(0, self.N, (self.n_nodes,))
-        # # Sort the sampled nodes
-        # z = z[torch.argsort(z)]
-
-        # # for each original node (1-N), find the closest node in the sampled nodes
-        # index = torch.arange(self.N)
-        # z_expanded = z.unsqueeze(0).expand(self.N, -1)  # n x n_nodes
-        # index_expanded = index.unsqueeze(1).expand(-1, self.n_nodes)  # n x n_nodes
-        # distances = torch.abs(index_expanded - z_expanded)
-        # closest_indices = torch.argmin(distances, dim=1).unsqueeze(0)  # 1 x n
-
-        # Construct one subsampled graph data
-        data = Data(
-            x=self.f[:, z, :],
-            edge_index=dense_to_sparse(self.W[:, z, :][:, :, z])[0],
-            A=self.W[:, z, :][:, :, z],
-            # indices=closest_indices,  # record how to map back to the graphon
-        )
-        return data
+        return self.dataset[idx]
