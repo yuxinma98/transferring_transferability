@@ -60,11 +60,12 @@ class GNNSizeGeneralizabilityModule(pl.LightningModule):
             d=self.params["feature_dim"],
             **self.params
         )
-        self.params["model"]["in_channels"] = (
-            self.params["feature_dim"] + 1
-            if self.params["task"] == "conditional_triangle"
-            else self.params["feature_dim"]
-        )
+        # self.params["model"]["in_channels"] = (
+        #     self.params["feature_dim"] + 1
+        #     if self.params["task"] == "conditional_triangle"
+        #     else self.params["feature_dim"]
+        # )
+        self.params["model"]["in_channels"] = 1
         self.params["model"]["out_channels"] = 1
         self.model = GNN(**self.params["model"])
 

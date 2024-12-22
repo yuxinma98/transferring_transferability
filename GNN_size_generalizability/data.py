@@ -59,7 +59,7 @@ class HomDensityDataset(InMemoryDataset):
                 A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
                 edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
 
-            x = torch.randn((n, self.d))  # Random node features, n x d
+            # x = torch.randn((n, self.d))  # Random node features, n x d
 
             if self.task == "degree":
                 y = pyg_utils.degree(edge_index[0]) / n
