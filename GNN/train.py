@@ -59,7 +59,12 @@ class GNNTrainingModule(pl.LightningModule):
             dataset = planetoid.Planetoid(root=self.params["data_dir"], name="PubMed", split="full")
             self.task = "classification"
         elif self.params["dataset"] == "SBM_Gaussian":
-            dataset = SBM_GaussianDataset(root=self.params["data_dir"], N=5000)
+            dataset = SBM_GaussianDataset(
+                root=self.params["data_dir"],
+                N=self.params["N"],
+                d=self.params["d"],
+                K=self.params["K"],
+            )
             self.task = "regression"
         elif self.params["dataset"] == "facebook":
             dataset = SNAPDataset(root=self.params["data_dir"], name="ego-facebook")

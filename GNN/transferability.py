@@ -56,10 +56,13 @@ if __name__ == "__main__":
         "logger": True,  # whether to use wandb to log
         "log_checkpoint": False,  # whether to log model checkpoint in wandb
         "log_model": None,  # whether to log gradient/parameters in wandb
-        "log_dir": "log/transferability",  # directory to save logs
+        "log_dir": "log/transferability/trained",  # directory to save logs
         # data parameters
         "data_dir": "/export/canton/data/yma93/anydim_transferability/GNN_transferability",
         "dataset": args.dataset,
+        "N": 5,
+        "d": 2,
+        "K": 3,
         "batch_size": 2,  # batch size to use in trasnferability experiment (set smaller to avoid memory issues)
         # model parameters
         "model": {
@@ -76,24 +79,37 @@ if __name__ == "__main__":
     }
     if not os.path.exists(params["log_dir"]):
         os.makedirs(params["log_dir"])
-    fname = f"results_{args.dataset}_{args.model}.json"
+    fname = f"results_{args.dataset}_{args.model}_{params['N']}.json"
+
+    try:
+        with open(os.path.join(params["log_dir"], fname), "r") as f:
+            results = json.load(f)
+    except FileNotFoundError:
+        results = {}
 
     # train model
-    # model = train(params)
-    # model.eval()
-    model = GNNTrainingModule(params)
-    model.prepare_data()
-    
+    model = train(params)
+    model.eval()
+    # model = GNNTrainingModule(params)
+    # model.prepare_data()
 
     # n_range = np.power(10, args.log_n_range).astype(int)
-    n_range = np.array([10, 15, 25, 50, 100, 250, 500, 1000, 2500])
-    results = {}
+    n_range = np.array([10, 15, 25, 50, 100, 250, 500, 1000, 2500, 5000, 8000])
     for i, n in enumerate(n_range):
         print(f"running for n = {n}")
         results.setdefault(str(n), [])
         n_samples = args.n_samples - len(results[str(n)])
         # sample smaller graphs and graph signals from the step graphon
-        subsampled_data = SubsampledDataset(params["data_dir"], model, args.dataset, n_samples, n)
+        subsampled_data = SubsampledDataset(
+            params["data_dir"],
+            model,
+            args.dataset,
+            n_samples,
+            n,
+            N=params["N"],
+            d=params["d"],
+            K=params["K"],
+        )
         test_loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
         # compute GNN output on subsampled graphs
         errors = []
@@ -105,10 +121,10 @@ if __name__ == "__main__":
                 target = subsampled_data.target.repeat(lcm // subsampled_data.N, 1)  # lcm * d_out
                 for j in range(len(batch)):
                     row_idx, col_idx = linear_sum_assignment(
-                        torch.matmul(out_transformed[j, :, :], target.transpose(-2, -1))
-                    )
+                        -torch.matmul(out_transformed[j, :, :], target.transpose(-2, -1))
+                    )  # this maximize Tr(x @ y.t @ P) over permutation P
                     errors.append(
-                        torch.norm(out_transformed[j, col_idx, :] - target[row_idx, :], p=2, dim=-2)
+                        torch.norm(out_transformed[j, row_idx, :] - target[col_idx, :], p=2, dim=-2)
                         / np.sqrt(lcm)
                     )
         errors = torch.stack(errors, dim=0)  # n_samples x D_out
@@ -135,6 +151,7 @@ if __name__ == "__main__":
     plt.xscale("log")
     plt.yscale("log")
     image_path = os.path.join(
-        params["log_dir"], f"transferability_{args.dataset}_{params['model']['model']}.png"
+        params["log_dir"],
+        f"transferability_{args.dataset}_{params['model']['model']}_{params['N']}.png",
     )
     plt.savefig(image_path)
