@@ -30,7 +30,6 @@ def eval(model, params, test_n_range):
             root=params["data_dir"],
             N=1000,
             n=test_params["n_nodes"],
-            d=params["feature_dim"],
             graph_model=params["graph_model"],
             task=params["task"],
         )
@@ -39,7 +38,7 @@ def eval(model, params, test_n_range):
             for batch in test_loader:
                 out = model(batch)
                 batch.y[batch.y == 0] = 1e-9  # avoid division by zero
-                relative_error = abs(out - batch.y) / (batch.y)  # dim: (batch_size * n)
+                relative_error = abs(out.reshape(-1) - batch.y) / (batch.y)  # dim: (batch_size * n)
                 test_loss[i] += relative_error.sum().item()
         test_loss[i] /= len(test_dataset) * n
     return test_loss.tolist()
@@ -92,7 +91,6 @@ if __name__ == "__main__":
         "n_nodes": args.training_graph_size,
         "graph_model": args.graph_model,
         "task": args.task,
-        "feature_dim": 1,  # dimension of node features
         "data_dir": "/export/canton/data/yma93/anydim_transferability/GNN_size_generalizability/",
         "val_fraction": 0.2,
         "test_fraction": 0.2,

@@ -15,7 +15,7 @@ from model import GNN
 
 def train(params):
     pl.seed_everything(params["training_seed"])
-    model = GNNSizeGeneralizabilityModule(params)
+    model = GNNTrainingModule(params)
     model_checkpoint = ModelCheckpoint(
         filename="{epoch}-{step}-{val_loss:.2f}",
         save_last=True,
@@ -45,9 +45,9 @@ def train(params):
     return model
 
 
-class GNNSizeGeneralizabilityModule(pl.LightningModule):
+class GNNTrainingModule(pl.LightningModule):
     def __init__(self, params):
-        super(GNNSizeGeneralizabilityModule, self).__init__()
+        super(GNNTrainingModule, self).__init__()
         self.save_hyperparameters(params)
         self.params = params
         self.loss = nn.MSELoss()
@@ -57,7 +57,6 @@ class GNNSizeGeneralizabilityModule(pl.LightningModule):
             root=self.params["data_dir"],
             N=self.params["n_graphs"],
             n=self.params["n_nodes"],
-            d=self.params["feature_dim"],
             **self.params
         )
         # self.params["model"]["in_channels"] = (
@@ -93,7 +92,7 @@ class GNNSizeGeneralizabilityModule(pl.LightningModule):
     def forward(self, data):
         A = pyg_utils.to_dense_adj(data.edge_index, batch=data.batch)
         x, mask = pyg_utils.to_dense_batch(data.x, batch=data.batch)
-        return self.model(A, x).reshape(-1)
+        return self.model(A, x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -103,18 +102,18 @@ class GNNSizeGeneralizabilityModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         out = self.forward(batch)
-        loss = self.loss(out, batch.y)
+        loss = self.loss(out.reshape(-1), batch.y)
         self.log("train_loss", loss, batch_size=self.params["batch_size"])
         return loss
 
     def validation_step(self, batch, batch_idx):
         out = self.forward(batch)
-        loss = self.loss(out, batch.y)
+        loss = self.loss(out.reshape(-1), batch.y)
         self.log("val_loss", loss, batch_size=self.params["batch_size"])
         return loss
 
     def test_step(self, batch, batch_idx):
         out = self.forward(batch)
-        loss = self.loss(out, batch.y)
+        loss = self.loss(out.reshape(-1), batch.y)
         self.log("test_loss", loss, batch_size=self.params["batch_size"])
         return loss

@@ -44,21 +44,14 @@ def train(params):
     wandb.finish()
     return model
 
-
-class GNNTrainingModule(pl.LightningModule):
+    # class GNNTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:
         super().__init__()
         self.save_hyperparameters(params)  # log hyperparameters in wandb
         self.params = params
 
     def prepare_data(self):
-        if self.params["dataset"] == "Cora":
-            dataset = planetoid.Planetoid(root=self.params["data_dir"], name="Cora", split="full")
-            self.task = "classification"
-        elif self.params["dataset"] == "PubMed":
-            dataset = planetoid.Planetoid(root=self.params["data_dir"], name="PubMed", split="full")
-            self.task = "classification"
-        elif self.params["dataset"] == "SBM_Gaussian":
+        if self.params["dataset"] == "SBM_Gaussian":
             dataset = SBM_GaussianDataset(
                 root=self.params["data_dir"],
                 N=self.params["N"],
