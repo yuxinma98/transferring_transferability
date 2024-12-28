@@ -13,10 +13,11 @@ class GNN_layer(nn.Module):
         x_in_channels: int,
         x_out_channels: int,
         reduced: bool = False,
+        bias: bool = True,
     ) -> None:
         super().__init__()
         self.reduced = reduced
-
+        self.bias = bias
         # Initialize parameters
         self.A_l1, self.A_l2, self.A_l4 = nn.ModuleList(
             nn.Linear(A_in_channels, A_out_channels, bias=False) for _ in range(3)
@@ -24,7 +25,6 @@ class GNN_layer(nn.Module):
         self.A_l6, self.A_l7 = nn.ModuleList(
             [nn.Linear(x_in_channels, A_out_channels, bias=False) for _ in range(2)]
         )
-        # self.A_bias = nn.Parameter(torch.zeros(1, 1, 1, A_out_channels))
         if not reduced:
             self.A_l3, self.A_l5 = nn.ModuleList(
                 nn.Linear(A_in_channels, A_out_channels, bias=False) for _ in range(2)
@@ -36,8 +36,11 @@ class GNN_layer(nn.Module):
         self.X1_l3, self.X1_l6, self.X2_l3, self.X2_l6 = nn.ModuleList(
             [nn.Linear(A_in_channels, x_out_channels, bias=False) for _ in range(4)]
         )
-        # self.X1_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
-        # self.X2_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
+
+        if self.bias:
+            self.A_bias = nn.Parameter(torch.zeros(1, 1, 1, A_out_channels))
+            self.X1_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
+            self.X2_bias = nn.Parameter(torch.zeros(1, 1, x_out_channels))
 
         if not reduced:
             self.X1_l4, self.X1_l5, self.X2_l4, self.X2_l5 = nn.ModuleList(
@@ -76,7 +79,8 @@ class GNN_layer(nn.Module):
         A_transform += self.A_l4((mean_of_cols + mean_of_cols.transpose(-2, -3)))  # N, n, n, A_out
         A_transform += self.A_l6(X.unsqueeze(dim=-2) + X.unsqueeze(dim=-3))  # N, n, n, A_out
         A_transform += self.A_l7(mean_X.unsqueeze(1))  # N, 1, 1, A_out
-        # A_transform += self.A_bias
+        if self.bias:
+            A_transform += self.A_bias
         if not self.reduced:
             A_transform += self.A_l3(mean_diag_part)  # N, 1, 1, A_out
             A_transform += self.A_l5(diag_part + diag_part.transpose(-2, -3))  # N, n, n, A_out
@@ -85,7 +89,8 @@ class GNN_layer(nn.Module):
         X1_transform += self.X1_l2(mean_X)  # N, 1, x_out
         X1_transform += self.X1_l3(mean_of_cols.squeeze(dim=-2))  # N, n, x_out
         X1_transform += self.X1_l6(mean_all.squeeze(dim=1))  # N, 1, x_out
-        # X1_transform += self.X1_bias  # 1, 1, x_out
+        if self.bias:
+            X1_transform += self.X1_bias  # 1, 1, x_out
         if not self.reduced:
             X1_transform += self.X1_l4(diag_part.squeeze(dim=-2))  # N, n, x_out
             X1_transform += self.X1_l5(mean_diag_part.squeeze(dim=-2))  # N, 1, x_out
@@ -94,7 +99,8 @@ class GNN_layer(nn.Module):
         X2_transform += self.X2_l2(mean_X)
         X2_transform += self.X2_l3(mean_of_cols.squeeze(dim=-2))
         X2_transform += self.X2_l6(mean_all.squeeze(dim=1))
-        # X2_transform += self.X2_bias
+        if self.bias:
+            X2_transform += self.X2_bias
         if not self.reduced:
             X2_transform += self.X2_l4(diag_part.squeeze(dim=-2))
             X2_transform += self.X2_l5(mean_diag_part.squeeze(dim=-2))
@@ -107,7 +113,7 @@ class GNN_layer(nn.Module):
 
 class GNNSimple_layer(nn.Module):
 
-    def __init__(self, in_channels: int, out_channels: int, reduced=False) -> None:
+    def __init__(self, in_channels: int, out_channels: int) -> None:
         super().__init__()
         self.in_channels = in_channels  # D1
         self.out_channels = out_channels  # D2
@@ -151,6 +157,7 @@ class GNN(nn.Module):
         out_channels: int,
         act: Callable = nn.ReLU(),
         model: str = "simple",  # choices in ["simple", "reduced", "unreduced", "ign"]
+        bias: bool = True,
         **kwargs
     ) -> None:
         super(GNN, self).__init__()
@@ -160,6 +167,7 @@ class GNN(nn.Module):
         self.out_channels = out_channels
         self.act = act
         self.model = model
+        self.bias = bias
         if kwargs:
             for key, value in kwargs.items():
                 setattr(self, key, value)
@@ -187,12 +195,18 @@ class GNN(nn.Module):
                         x_in_channels=self.in_channels,
                         x_out_channels=self.out_channels,
                         reduced=reduced,
+                        bias=self.bias,
                     )
                 )
             else:
                 self.layers.append(
                     GNN_layer(
-                        1, self.hidden_channels, self.in_channels, self.hidden_channels, reduced
+                        1,
+                        self.hidden_channels,
+                        self.in_channels,
+                        self.hidden_channels,
+                        reduced,
+                        self.bias,
                     )
                 )
                 for _ in range(self.num_layers - 2):
@@ -204,6 +218,7 @@ class GNN(nn.Module):
                             self.hidden_channels,
                             self.hidden_channels,
                             reduced,
+                            self.bias,
                         )
                     )
                 self.layers.append(self.act)
@@ -214,6 +229,7 @@ class GNN(nn.Module):
                         self.hidden_channels,
                         self.out_channels,
                         reduced,
+                        self.bias,
                     )
                 )
 
@@ -230,16 +246,22 @@ class GNN(nn.Module):
 
         if self.model == "ign_anydim":
             if self.num_layers == 1:
-                self.layers.append(layer_2_to_1_anydim(self.in_channels + 1, self.out_channels))
+                self.layers.append(
+                    layer_2_to_1_anydim(self.in_channels + 1, self.out_channels, self.bias)
+                )
             else:
-                self.layers.append(layer_2_to_2_anydim(self.in_channels + 1, self.hidden_channels))
+                self.layers.append(
+                    layer_2_to_2_anydim(self.in_channels + 1, self.hidden_channels, self.bias)
+                )
                 for _ in range(self.num_layers - 2):
                     self.layers.append(self.act)
                     self.layers.append(
-                        layer_2_to_2_anydim(self.hidden_channels, self.hidden_channels)
+                        layer_2_to_2_anydim(self.hidden_channels, self.hidden_channels, self.bias)
                     )
                 self.layers.append(self.act)
-                self.layers.append(layer_2_to_1_anydim(self.hidden_channels, self.out_channels))
+                self.layers.append(
+                    layer_2_to_1_anydim(self.hidden_channels, self.out_channels, self.bias)
+                )
 
     def forward(self, adj: Tensor, feature: Tensor) -> Tensor:
         """

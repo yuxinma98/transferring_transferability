@@ -101,6 +101,7 @@ if __name__ == "__main__":
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
             "model": args.model,
+            "bias": False,
         },
         # training parameters
         "lr": args.lr,

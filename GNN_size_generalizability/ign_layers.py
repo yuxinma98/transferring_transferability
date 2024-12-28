@@ -12,11 +12,12 @@ class layer_2_to_2_anydim(nn.Module):
     Layer for symmetric equivariant GNNs
     """
 
-    def __init__(self, input_depth, output_depth):
+    def __init__(self, input_depth, output_depth, bias=True):
         super().__init__()
         self.input_depth = input_depth
         self.output_depth = output_depth
         self.basis_dimension = 5
+        self.bias = bias
 
         # initialization values for variables
         self.coeffs = torch.nn.Parameter(
@@ -25,9 +26,10 @@ class layer_2_to_2_anydim(nn.Module):
             / (self.input_depth + self.output_depth),
             requires_grad=True,
         )
-        self.all_bias = torch.nn.Parameter(
-            torch.zeros(1, self.output_depth, 1, 1), requires_grad=True
-        )
+        if bias:
+            self.all_bias = torch.nn.Parameter(
+                torch.zeros(1, self.output_depth, 1, 1), requires_grad=True
+            )
 
     def forward(self, inputs):
         m = inputs.size(3)  # extract dimension
@@ -47,7 +49,8 @@ class layer_2_to_2_anydim(nn.Module):
 
         ops_out = torch.stack([op1, op2, op3, op4, op5], dim=2)
         output = torch.einsum("dsb,ndbij->nsij", self.coeffs, ops_out)
-        output = output + self.all_bias
+        if self.bias:
+            output = output + self.all_bias
         return output
 
 
@@ -56,12 +59,12 @@ class layer_2_to_1_anydim(nn.Module):
     Layer for symmetric equivariant GNNs
     """
 
-    def __init__(self, input_depth, output_depth):
+    def __init__(self, input_depth, output_depth, bias=True):
         super().__init__()
         self.input_depth = input_depth
         self.output_depth = output_depth
         self.basis_dimension = 4
-
+        self.bias = bias
         # initialization values for variables
         self.coeffs = torch.nn.Parameter(
             torch.randn(self.input_depth, self.output_depth, self.basis_dimension)
@@ -69,7 +72,10 @@ class layer_2_to_1_anydim(nn.Module):
             / (self.input_depth + self.output_depth),
             requires_grad=True,
         )
-        self.bias = torch.nn.Parameter(torch.zeros(1, self.output_depth, 1), requires_grad=True)
+        if bias:
+            self.bias_param = torch.nn.Parameter(
+                torch.zeros(1, self.output_depth, 1), requires_grad=True
+            )
 
     def forward(self, inputs):
         m = inputs.size(3)  # extract dimension
@@ -88,7 +94,8 @@ class layer_2_to_1_anydim(nn.Module):
 
         ops_out = torch.stack([op1, op2, op3, op4], dim=2)
         output = torch.einsum('dsb,ndbi->nsi', self.coeffs, ops_out)
-        output = output + self.bias
+        if self.bias:
+            output = output + self.bias_param
         return output
 
 

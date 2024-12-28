@@ -75,6 +75,7 @@ if __name__ == "__main__":
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
             "model": args.model,  # choice in ["simple", "reduced", "unreduced", "ign", "ign_anydim"]
+            "bias": True,
         },
         # training parameters
         "lr": args.lr,
