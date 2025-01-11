@@ -30,7 +30,10 @@ if __name__ == "__main__":
         choices=["simple", "reduced", "unreduced", "ign", "ign_anydim"],
     )
     parser.add_argument(
-        "--graph_model", type=str, default="Sociality", choices=["ER", "SBM", "Sociality", "spiked"]
+        "--graph_model",
+        type=str,
+        default="Sociality",
+        choices=["ER", "SBM", "Sociality", "Gaussian"],
     )
     parser.add_argument(
         "--task",
@@ -129,26 +132,28 @@ if __name__ == "__main__":
             errors = []
             with torch.no_grad():
                 for batch in tqdm(test_loader):
-                    out = model(batch).detach()  # batch_size x n
+                    out = model(batch).detach()  # batch_size x n x d_out
                     out_transformed = out.repeat(1, lcm // n, 1)  # batch_size x lcm x d_out
-                    # if target.shape[-1] == 1:
-                    out_transformed, _ = out_transformed.sort(dim=1)
-                    errors.append(torch.norm(out_transformed - target, p=2, dim=-2) / np.sqrt(lcm))
-                    # else:  # require solving the assignment problem:
-                    for j in range(len(batch)):
-                        row_idx, col_idx = linear_sum_assignment(
-                            -torch.matmul(
-                                out_transformed[j, :, :], target.squeeze(0).transpose(-2, -1)
-                            )
-                        )  # this maximize Tr(x @ y.t @ P) over permutation P
+                    if target.shape[-1] == 1:
+                        out_transformed, _ = out_transformed.sort(dim=1)
                         errors.append(
-                            torch.norm(
-                                out_transformed[j, row_idx, :] - target[0, col_idx, :],
-                                p=2,
-                                dim=-2,
-                            ).unsqueeze(0)
-                            / np.sqrt(lcm)
+                            torch.norm(out_transformed - target, p=2, dim=-2) / np.sqrt(lcm)
                         )
+                    else:  # require solving the assignment problem:
+                        for j in range(len(batch)):
+                            row_idx, col_idx = linear_sum_assignment(
+                                -torch.matmul(
+                                    out_transformed[j, :, :], target.squeeze(0).transpose(-2, -1)
+                                )
+                            )  # this maximize Tr(x @ y.t @ P) over permutation P
+                            errors.append(
+                                torch.norm(
+                                    out_transformed[j, row_idx, :] - target[0, col_idx, :],
+                                    p=2,
+                                    dim=-2,
+                                ).unsqueeze(0)
+                                / np.sqrt(lcm)
+                            )
                 errors = torch.concat(errors, dim=0)  # n_samples x D_out
                 errors = errors.max(dim=1)[0]  # n_samples
                 results[str(n)] += errors.tolist()
