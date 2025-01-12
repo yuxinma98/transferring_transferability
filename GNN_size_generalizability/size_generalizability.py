@@ -6,6 +6,7 @@ import json
 import matplotlib.pyplot as plt
 import torch
 from torch_geometric.loader import DataLoader
+from torchmetrics import MeanSquaredError
 from tqdm import tqdm
 
 from train import train
@@ -24,6 +25,7 @@ def eval(model, params, test_n_range):
     test_params = params.copy()
     test_params["batch_size"] = 5
     test_loss = np.zeros(len(test_n_range))
+    mean_squared_error = MeanSquaredError()
     for i, n in tqdm(enumerate(test_n_range)):
         test_params["n_nodes"] = int(n)
         test_dataset = HomDensityDataset(
@@ -37,9 +39,12 @@ def eval(model, params, test_n_range):
         with torch.no_grad():
             for batch in test_loader:
                 out = model(batch)
-                batch.y[batch.y == 0] = 1e-9  # avoid division by zero
-                relative_error = abs(out.reshape(-1) - batch.y) / (batch.y)  # dim: (batch_size * n)
-                test_loss[i] += relative_error.sum().item()
+                # batch.y[batch.y == 0] = 1e-9  # avoid division by zero
+                # relative_error = abs(out.reshape(-1) - batch.y) / abs(
+                #     batch.y
+                # )  # dim: (batch_size * n)
+                # test_loss[i] += relative_error.sum().item()
+                test_loss[i] += mean_squared_error(out.reshape(-1), batch.y).item() * len(batch.y)
         test_loss[i] /= len(test_dataset) * n
     return test_loss.tolist()
 
@@ -53,14 +58,12 @@ if __name__ == "__main__":
         default="reduced",
         choices=["simple", "reduced", "unreduced", "ign", "ign_anydim"],
     )
-    parser.add_argument(
-        "--graph_model", type=str, default="ER", choices=["ER", "SBM", "Sociality", "Gaussian"]
-    )
+    parser.add_argument("--graph_model", type=str, default="SBM_Gaussian", choices=["SBM_Gaussian"])
     parser.add_argument(
         "--task",
         type=str,
         default="degree",
-        choices=["degree", "triangle", "4-cycle", "conditional_triangle"],
+        choices=["degree", "triangle"],
     )
     parser.add_argument("--training_graph_size", type=int, default=50)
     parser.add_argument(

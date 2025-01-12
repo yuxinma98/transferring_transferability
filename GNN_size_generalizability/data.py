@@ -5,7 +5,6 @@ from typing import Union
 import pytorch_lightning as pl
 from torch_geometric.data import Data, InMemoryDataset
 import torch_geometric.utils as pyg_utils
-from torch_geometric.datasets import SNAPDataset
 from torch.utils.data import Dataset
 
 
@@ -93,19 +92,27 @@ class SBM_GaussianDataset(Dataset):
 
 class HomDensityDataset(InMemoryDataset):
 
-    def __init__(self, root, N, n, graph_model, task, **kwargs):
+    def __init__(
+        self,
+        root: Union[str, os.PathLike],
+        N: int,
+        n: Union[int, tuple],
+        graph_model: str,
+        task: str,
+        **kwargs,
+    ):
+        """
+        Args:
+            root (Union[str, os.PathLike]): directory to save the dataset
+            N (int): Number of graphs
+            n (Union[int, tuple]): Number of nodes
+            graph_model (str): choice of graph generative model for the generation of data
+            task (str): choice of task for learning
+        """
         self.N = N
         self.n = n
         self.graph_model = graph_model
         self.task = task
-        if self.graph_model == "ER":
-            self.p = [0.3, 0.7]
-        elif self.graph_model == "SBM":
-            self.ps = torch.tensor([[0.8, 0.15, 0.05], [0.15, 0.7, 0.25], [0.05, 0.25, 0.9]])
-        elif self.graph_model == "Sociality":
-            self.kernel = lambda x, y: 1 / (1 + torch.exp(-x * y))
-        elif self.graph_model == "Gaussian":
-            self.kernel = lambda x, y: torch.exp(-((x - y) ** 2) / 0.1)
         super(HomDensityDataset, self).__init__(root=root, transform=None, pre_transform=None)
         self.data, self.slices = self.process()
 
@@ -122,41 +129,48 @@ class HomDensityDataset(InMemoryDataset):
             else:
                 n = random.randint(self.n[0], self.n[1])
 
-            if self.graph_model == "ER":
-                if isinstance(self.p, float):
-                    p = self.p
-                else:
-                    p = random.uniform(self.p[0], self.p[1])
-                edge_index = pyg_utils.erdos_renyi_graph(n, p)
-                A = pyg_utils.to_dense_adj(edge_index).squeeze()
-            elif self.graph_model == "SBM":
-                z = torch.randint(0, 3, (n,))
-                z_one_hot = torch.nn.functional.one_hot(z, num_classes=3).float()
-                prob_matrix = z_one_hot @ self.ps
+            if self.graph_model == "SBM_Gaussian":
+                # Randomly generate SBM parameters
+                # K = random.randint(2, 10)  # Number of clusters
+                K = 3
+                p0 = random.random()
+                p1 = random.random()
+                ps = torch.tensor(
+                    [[p0, p1, p1], [p1, p0, p1], [p1, p1, p0]]
+                )  # 3 x 3 probability matrix for SBM
+                # ps = torch.rand((K, K))  # random K x K probability matrix for SBM
+                # ps = ps.tril(diagonal=0) + ps.tril(diagonal=-1).transpose(-1, -2)
+
+                # Randomly generate mean for Gaussian signals
+                # mu = torch.randn(K, 1)
+
+                # Generate graph
+                z = torch.randint(0, K, (n,))
+                z_one_hot = torch.nn.functional.one_hot(z, num_classes=K).float()
+                prob_matrix = z_one_hot @ ps
                 prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)
-                A = torch.distributions.Bernoulli(prob_matrix).sample()
-                A = A.tril(diagonal=-1) + A.tril(diagonal=-1).transpose(-1, -2)
-                edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
-            elif self.graph_model == "Sociality" or self.graph_model == "Gaussian":
-                uniform_sampler = torch.distributions.Uniform(0, 1)
-                z = uniform_sampler.sample((n,))
-                prob_matrix = self.kernel(z.unsqueeze(1), z.unsqueeze(0))
                 A = torch.distributions.Bernoulli(prob_matrix).sample()
                 A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
                 edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
 
-            # x = torch.randn((n, self.d))  # Random node features, n x d
+                # Generate features
+                # x = torch.randn((n, 1)) + mu[z]
+                x = torch.randn((n, 1))
 
-            if self.task == "degree":
-                y = pyg_utils.degree(edge_index[0]) / n
-            elif self.task == "conditional_triangle":
-                mask = z < 0.3
-                A[mask, :][:, mask] = 0
-                y = (A @ A @ A).diag() / (n**2)
-            elif self.task == "4-cycle":
-                y = (A @ A @ A @ A).diag() / (n**3)
+            if self.task == "triangle":
+                # A_conditional = torch.zeros_like(A)
+                # indices = torch.where(x > 0)[0]
+                # A_conditional[indices.unsqueeze(-1), indices.unsqueeze(0)] = A[
+                #     indices.unsqueeze(-1), indices.unsqueeze(0)
+                # ]
+                # y = (A_conditional @ A_conditional @ A_conditional).diag() / (n**2)
+                y = torch.einsum("ij,jk,ki,id,jd,kd -> id", A, A, A, x, x, x) / (n**2)
+                y = y.squeeze(-1)
+            elif self.task == "degree":
+                y = torch.einsum("ij,ji,id,jd -> id", A, A, x, x) / n
+                y = y.squeeze(-1)
 
-            data = Data(x=z.unsqueeze(-1), edge_index=edge_index, y=y)
+            data = Data(x=x, edge_index=edge_index, y=y)
             data_list.append(data)
 
         data, slices = self.collate(data_list)
