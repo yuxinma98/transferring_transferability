@@ -156,14 +156,27 @@ class HomDensityDataset(InMemoryDataset):
                 # Generate features
                 # x = torch.randn((n, 1)) + mu[z]
                 x = torch.randn((n, 1))
+            elif self.graph_model == "full_SBM_Gaussian":
+                # Randomly generate SBM parameters
+                K = random.randint(2, 10)  # Number of clusters
+                ps = torch.rand((K, K))  # random K x K probability matrix for SBM
+                ps = ps.tril(diagonal=0) + ps.tril(diagonal=-1).transpose(-1, -2)
+                # Randomly generate mean for Gaussian signals
+                mu = torch.randn(K, 1)
+
+                # Generate graph
+                z = torch.randint(0, K, (n,))
+                z_one_hot = torch.nn.functional.one_hot(z, num_classes=K).float()
+                prob_matrix = z_one_hot @ ps
+                prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)
+                A = torch.distributions.Bernoulli(prob_matrix).sample()
+                A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
+                edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
+
+                # Generate features
+                x = torch.randn((n, 1)) + mu[z]
 
             if self.task == "triangle":
-                # A_conditional = torch.zeros_like(A)
-                # indices = torch.where(x > 0)[0]
-                # A_conditional[indices.unsqueeze(-1), indices.unsqueeze(0)] = A[
-                #     indices.unsqueeze(-1), indices.unsqueeze(0)
-                # ]
-                # y = (A_conditional @ A_conditional @ A_conditional).diag() / (n**2)
                 y = torch.einsum("ij,jk,ki,id,jd,kd -> id", A, A, A, x, x, x) / (n**2)
                 y = y.squeeze(-1)
             elif self.task == "degree":

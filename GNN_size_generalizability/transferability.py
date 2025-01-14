@@ -32,20 +32,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--graph_model",
         type=str,
-        default="Sociality",
-        choices=["ER", "SBM", "Sociality", "Gaussian"],
+        default="SBM_Gaussian",
+        choices=["SBM_Gaussian", "full_SBM_Gaussian"],
     )
     parser.add_argument(
         "--task",
         type=str,
-        default="conditional_triangle",
-        choices=["degree", "triangle", "4-cycle", "conditional_triangle"],
+        default="triangle",
+        choices=["degree"],
     )
     parser.add_argument("--training_graph_size", type=int, default=50)
     parser.add_argument(
         "--n_samples",
         type=int,
-        default=10,
+        default=50,
         help="In the transferability experiment, for each graph size n, how many samples to generate from the step graphon",
     )
     # GNN parameters
