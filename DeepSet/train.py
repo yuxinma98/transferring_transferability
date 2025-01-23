@@ -62,23 +62,27 @@ class DeepSetTrainingModule(pl.LightningModule):
 
     def on_validation_end(self):
         super().on_validation_end()
-        truth = self.trainer.datamodule.truth
-        val = self.trainer.datamodule.val_dataset
-        y_pred = self.predict(val.X)
-        font = {'size': 14}
-        matplotlib.rc('font', **font)
-        scale = 0.5
-        plt.figure(figsize=(10*scale, 7.5*scale))
-        plt.plot(truth.t, truth.y)
-        plt.plot(val.t.tolist(), y_pred.tolist(), 'x')
-        plt.xlabel('Index')
-        plt.ylabel('Statistics')
-        plt.legend(['Truth', 'DeepSet'], loc=3, fontsize=12)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.params["log_dir"], "current_status.png"))
-        plt.close()
-        if self.params.get("logger", True):
-            self.logger.log_image(key = "current_status", images = [os.path.join(self.params["log_dir"], "current_status.png")])
+        if self.current_epoch % 50 == 0:
+            truth = self.trainer.datamodule.truth
+            val = self.trainer.datamodule.val_dataset
+            y_pred = self.predict(val.X)
+            font = {"size": 14}
+            matplotlib.rc("font", **font)
+            scale = 0.5
+            plt.figure(figsize=(10 * scale, 7.5 * scale))
+            plt.plot(truth.t, truth.y)
+            plt.plot(val.t.tolist(), y_pred.tolist(), "x")
+            plt.xlabel("Index")
+            plt.ylabel("Statistics")
+            plt.legend(["Truth", "DeepSet"], loc=3, fontsize=12)
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.params["log_dir"], "current_status.png"))
+            plt.close()
+            if self.params.get("logger", True):
+                self.logger.log_image(
+                    key="current_status",
+                    images=[os.path.join(self.params["log_dir"], "current_status.png")],
+                )
 
     def test_step(self, batch, batch_idx):
         X, y = batch
