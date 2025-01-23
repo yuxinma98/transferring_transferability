@@ -127,4 +127,8 @@ def train(params, stopping_threshold=False):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
-    return model
+
+    test_data = data.test_dataset
+    y_pred = model.predict(test_data.X)
+    y_pred_out = [test_data.t.tolist(), y_pred.tolist()]
+    return model, y_pred_out

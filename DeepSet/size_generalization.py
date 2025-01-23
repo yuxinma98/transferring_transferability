@@ -38,12 +38,12 @@ if __name__ == '__main__':
     parser.add_argument(
         "--test_n_range",
         type=list,
-        default=list(np.arange(1000, 5000, 500)),
+        default=list(np.arange(500, 5000, 500)),
         help="List of test set sizes",
     )
     parser.add_argument("--training_size", type=int, default=500, help="Set size of training data")
     parser.add_argument("--num_trials", type=int, default=10, help="Number of trials to run")
-    
+
     # DeepSet model parameters
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--hidden_channels", type=int, default=50)
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     params = {
-        #logger parameters
+        # logger parameters
         "project": "anydim_transferability",
         "name": "deepset_size_generalization",
         "logger": True,
@@ -62,11 +62,11 @@ if __name__ == '__main__':
         "log_model": None,
         "log_dir": os.path.join(CURRENT_DIR, "log/size_generalization"),
         # data parameters
-        "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
+        "data_dir": "/export/canton/data/yma93/anydim_transferability/deepset/",
         "training_size": args.training_size,
         "batch_size": 128,
         # model parameters
-        "model":{
+        "model": {
             "hidden_channels": args.hidden_channels,
             "set_channels": args.set_channels,
             "feature_extractor_num_layers": args.num_layers,
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         "lr_patience": 50,
         "weight_decay": 0.1,
         "max_epochs": args.max_epochs,
-        "training_seed":42,
+        "training_seed": 42,
     }
     if not os.path.exists(params["log_dir"]):
         os.makedirs(params["log_dir"])
@@ -94,34 +94,36 @@ if __name__ == '__main__':
 
     for task_id in [1,2,3,4]:
         params["task_id"] = task_id
-        results.setdefault(str(task_id), {}).setdefault("normalized", {})
-        results[str(task_id)].setdefault("unnormalized", {})
+        results.setdefault(f"task{task_id}", {}).setdefault("normalized", {})
+        results[f"task{task_id}"].setdefault("unnormalized", {})
 
         # run experiments
         for seed in range(args.num_trials): # run multiple trials
-            if str(seed) not in results[str(task_id)]["normalized"]: # skip if already done
+            if str(seed) not in results[f"task{task_id}"]["normalized"]:  # skip if already done
                 params["model"]["normalized"] = True
                 params["training_seed"] = seed
-                model_normalized = train(params)
+                model_normalized, test_out_normalized = train(params)
                 mse_normalized = eval(model_normalized, params, args.test_n_range)
-                results[str(task_id)]["normalized"][str(seed)] = mse_normalized
-            if str(seed) not in results[str(task_id)]["unnormalized"]:
+                results[f"task{task_id}"]["normalized"][str(seed)]["mse"] = mse_normalized
+                results[f"task{task_id}"]["normalized"][str(seed)]["output"] = test_out_normalized
+            if str(seed) not in results[f"task{task_id}"]["unnormalized"]:
                 params["model"]["normalized"] = False
-                model_unnormalized = train(params)
+                model_unnormalized, test_out_unnormalized = train(params)
                 mse_unnormalized = eval(model_unnormalized, params, args.test_n_range)
-                results[str(task_id)]["unnormalized"][
-                    str(seed)
-                ] = mse_unnormalized
+                results[f"task{task_id}"]["unnormalized"][str(seed)]["mse"] = mse_unnormalized
+                results[f"task{task_id}"]["unnormalized"][str(seed)][
+                    "output"
+                ] = test_out_unnormalized
             with open(os.path.join(params["log_dir"], 'results.json'), 'w') as f:
                 json.dump(results, f)
 
         # plot results
         log_mse_normalized_list = [
-            np.log(results[str(task_id)]["normalized"][str(seed)])
+            np.log(results[f"task{task_id}"]["normalized"][str(seed)])
             for seed in range(args.num_trials)
         ]
         log_mse_unnormalized_list = [
-            np.log(results[str(task_id)]["unnormalized"][str(seed)])
+            np.log(results[f"task{task_id}"]["unnormalized"][str(seed)])
             for seed in range(args.num_trials)
         ]
         mean_mse_normalized = np.mean(log_mse_normalized_list, axis=0)
@@ -130,17 +132,16 @@ if __name__ == '__main__':
         std_mse_unnormalized = np.std(log_mse_unnormalized_list, axis=0)
 
         plt.figure()
-        x = np.arange(1000, 5000, 500)
-        plt.plot(x, mean_mse_normalized, label="Normalized")
+        plt.plot(args.test_n_range, mean_mse_normalized, label="Normalized")
         plt.fill_between(
-            x,
+            args.test_n_range,
             mean_mse_normalized - std_mse_normalized,
             mean_mse_normalized + std_mse_normalized,
             alpha=0.3,
         )
-        plt.plot(np.arange(1000,5000,500), mean_mse_unnormalized, label='Unnormalized')
+        plt.plot(args.test_n_range, mean_mse_unnormalized, label="Unnormalized")
         plt.fill_between(
-            x,
+            args.test_n_range,
             mean_mse_unnormalized - std_mse_unnormalized,
             mean_mse_unnormalized + std_mse_unnormalized,
             alpha=0.3,

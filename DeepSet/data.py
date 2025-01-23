@@ -12,17 +12,9 @@ class PopStatsDataset(Dataset):
         
         # Load data from Matlab
         with h5py.File(fname, 'r') as f:
-            # self.L = f['L'][()].astype('int32').item() # number of sets
-            # self.N = f['N'][()].astype('int32').item() # number of elements in set
-            # self.t = np.squeeze(f['X_parameter'][()])
-            # self.X = f['X'][()]
-            # self.d = self.X.shape[0]
-            # self.X = np.reshape(self.X.transpose(), [-1, self.N, self.d]).astype('float32')
-            # self.y = np.reshape(f['Y'][()], [-1, 1]).astype('float32')
-
             self.L = torch.tensor(f['L'][()], dtype=torch.int32).item()  # number of sets
             self.N = torch.tensor(f['N'][()], dtype=torch.int32).item()  # number of elements in set
-            self.t = torch.tensor(np.squeeze(f['X_parameter'][()]), dtype=torch.float32)
+            self.t = torch.tensor(np.squeeze(f['X_parameter'][()]), dtype=torch.float32) # parametrization of distribution. e.g. rotation angles for task 1
             self.X = torch.tensor(f['X'][()], dtype=torch.float32)
             self.d = self.X.shape[0]
             self.X = self.X.transpose(0, 1).reshape(-1, self.N, self.d)

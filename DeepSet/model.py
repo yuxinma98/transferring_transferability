@@ -13,13 +13,13 @@ class DeepSet(nn.Module):
                  **kwargs) -> None:
         super(DeepSet, self).__init__()
         self.normalized = normalized
-        
+
         # Feature extractor
         feature_extractor_layers = [nn.Linear(in_channels, hidden_channels)]
         for _ in range(feature_extractor_num_layers - 2):
-            feature_extractor_layers.append(nn.ELU(inplace=True))
+            feature_extractor_layers.append(nn.ReLU(inplace=True))
             feature_extractor_layers.append(nn.Linear(hidden_channels, hidden_channels))
-        feature_extractor_layers.append(nn.ELU(inplace=True))
+        feature_extractor_layers.append(nn.ReLU(inplace=True))
         feature_extractor_layers.append(nn.Linear(hidden_channels, set_channels))
         self.feature_extractor = nn.Sequential(*feature_extractor_layers)
 
@@ -29,13 +29,12 @@ class DeepSet(nn.Module):
         else:
             regressor_layers = [nn.Linear(set_channels, hidden_channels)]
             for _ in range(regressor_num_layers - 2):
-                regressor_layers.append(nn.ELU(inplace=True))
+                regressor_layers.append(nn.ReLU(inplace=True))
                 regressor_layers.append(nn.Linear(hidden_channels, hidden_channels))
-            regressor_layers.append(nn.ELU(inplace=True))
+            regressor_layers.append(nn.ReLU(inplace=True))
             regressor_layers.append(nn.Linear(hidden_channels, out_channels))
             self.regressor = nn.Sequential(*regressor_layers)
-        
-            
+
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
 
@@ -43,7 +42,7 @@ class DeepSet(nn.Module):
             input (torch.Tensor): B x N x in_channels
 
         Returns:
-            torch.Tensor: B x N x out_channels
+            torch.Tensor: B x out_channels
         """
         x = input # B x N x in_channels
         x = self.feature_extractor(x) # B x N x set_channels
