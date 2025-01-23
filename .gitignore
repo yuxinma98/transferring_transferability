@@ -11,3 +11,5 @@ DeepSet/generator/data_old
 GNN_size_generalizability/__pycache__
 GNN_size_generalizability/log
 GNN_size_generalizability/data
+O(n)/__pycache__
+O(n)/log
