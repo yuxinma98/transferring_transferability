@@ -117,8 +117,14 @@ class OIDSTrainingModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         out = self.forward(batch)
-        loss = self.loss(out, self.trainer.datamodule.dist_true_train.to(out.device))
+        dist_true_train = self.trainer.datamodule.dist_true_train.to(self.device)
+        loss = self.loss(out, dist_true_train)
+        rank_corr = self.spearman(
+            out.reshape(-1, 1),
+            dist_true_train.reshape(-1, 1),
+        )
         self.log("train_loss", loss)
+        self.log("train_rank_corr", rank_corr)
         return loss
 
     def validation_step(self, batch, batch_idx):
