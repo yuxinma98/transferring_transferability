@@ -105,7 +105,12 @@ if __name__ == "__main__":
         results = {}
 
     fig, axes = plt.subplots(2, 4, figsize=(20, 10))
-    titles = {1: "Rotation", 2: "Correlation", 3: "Rank 1", 4: "Rnadom"}
+    titles = {
+        1: "Task1: Rotation",
+        2: "Task2: Correlation",
+        3: "Task3: Rank 1",
+        4: "Task4: Random",
+    }
     ylabels = {
         1: "Entropy",
         2: "Mutual Information",
@@ -221,5 +226,5 @@ if __name__ == "__main__":
         ax.legend(loc="upper right", fontsize=16)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(params["log_dir"], "deepset_plot.png"))
+    plt.savefig(os.path.join(params["log_dir"], "deepset_plot.pdf"))
     plt.close()
