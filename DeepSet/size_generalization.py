@@ -5,9 +5,19 @@ from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
 import numpy as np
 from data import PopStatsDataset
+import matplotlib
+
 from train import train
+from data import PopStatsDataModule
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+ibm_colors = [
+    "#648FFF",  # Blue
+    "#785EF0",  # Purple
+    "#DC267F",  # Pink
+    "#FE6100",  # Orange
+    "#FFB000",  # Yellow
+]
 
 
 def str2bool(value):
@@ -26,13 +36,15 @@ def eval(model, params, test_n_range):
     mse = MeanSquaredError()
     test_mse = []
     for N in test_n_range:
-        dataset = PopStatsDataset(fname = os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat'))
+        dataset = PopStatsDataset(
+            fname=os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat')
+        )
         y_pred = model.predict(dataset.X)
         test_mse.append(float(mse(y_pred, dataset.y)))
     return test_mse
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment set-up
     parser.add_argument(
@@ -87,69 +99,127 @@ if __name__ == '__main__':
 
     # load results
     try:
-        with open(os.path.join(params["log_dir"], 'results.json'), 'r') as f:
+        with open(os.path.join(params["log_dir"], "results.json"), "r") as f:
             results = json.load(f)
     except:
         results = {}
 
-    for task_id in [1,2,3,4]:
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    titles = {1: "Rotation", 2: "Correlation", 3: "Rank 1", 4: "Rnadom"}
+    ylabels = {
+        1: "Entropy",
+        2: "Mutual Information",
+        3: "Mutual Information",
+        4: "Mutual information",
+    }
+    xlabels = {1: "Rotation Angle", 2: "Correlation", 3: "Rank-1 Length", 4: "Sorted Index"}
+
+    for task_id in [1, 2, 3, 4]:
         params["task_id"] = task_id
         results.setdefault(f"task{task_id}", {}).setdefault("normalized", {})
         results[f"task{task_id}"].setdefault("unnormalized", {})
 
         # run experiments
-        for seed in range(args.num_trials): # run multiple trials
+        for seed in range(args.num_trials):  # run multiple trials
             if str(seed) not in results[f"task{task_id}"]["normalized"]:  # skip if already done
                 params["model"]["normalized"] = True
                 params["training_seed"] = seed
                 model_normalized, test_out_normalized = train(params)
                 mse_normalized = eval(model_normalized, params, args.test_n_range)
-                results[f"task{task_id}"]["normalized"][str(seed)]["mse"] = mse_normalized
-                results[f"task{task_id}"]["normalized"][str(seed)]["output"] = test_out_normalized
+                results[f"task{task_id}"]["normalized"][str(seed)] = {
+                    "mse": mse_normalized,
+                    "output": test_out_normalized,
+                }
             if str(seed) not in results[f"task{task_id}"]["unnormalized"]:
                 params["model"]["normalized"] = False
                 model_unnormalized, test_out_unnormalized = train(params)
                 mse_unnormalized = eval(model_unnormalized, params, args.test_n_range)
-                results[f"task{task_id}"]["unnormalized"][str(seed)]["mse"] = mse_unnormalized
-                results[f"task{task_id}"]["unnormalized"][str(seed)][
-                    "output"
-                ] = test_out_unnormalized
-            with open(os.path.join(params["log_dir"], 'results.json'), 'w') as f:
+                results[f"task{task_id}"]["unnormalized"][str(seed)] = {
+                    "mse": mse_unnormalized,
+                    "output": test_out_unnormalized,
+                }
+            with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
                 json.dump(results, f)
 
-        # plot results
+        # plot MSE
         log_mse_normalized_list = [
-            np.log(results[f"task{task_id}"]["normalized"][str(seed)])
+            np.log(results[f"task{task_id}"]["normalized"][str(seed)]["mse"])
             for seed in range(args.num_trials)
         ]
         log_mse_unnormalized_list = [
-            np.log(results[f"task{task_id}"]["unnormalized"][str(seed)])
+            np.log(results[f"task{task_id}"]["unnormalized"][str(seed)]["mse"])
             for seed in range(args.num_trials)
         ]
         mean_mse_normalized = np.mean(log_mse_normalized_list, axis=0)
-        std_mse_normalized = np.std(log_mse_normalized_list, axis=0)
         mean_mse_unnormalized = np.mean(log_mse_unnormalized_list, axis=0)
-        std_mse_unnormalized = np.std(log_mse_unnormalized_list, axis=0)
 
-        plt.figure()
-        plt.plot(args.test_n_range, mean_mse_normalized, label="Normalized")
-        plt.fill_between(
+        ax = axes[0, task_id - 1]
+        ax.plot(
             args.test_n_range,
-            mean_mse_normalized - std_mse_normalized,
-            mean_mse_normalized + std_mse_normalized,
-            alpha=0.3,
+            mean_mse_normalized,
+            "o-",
+            label="Normalized DeepSet",
+            color=ibm_colors[0],
         )
-        plt.plot(args.test_n_range, mean_mse_unnormalized, label="Unnormalized")
-        plt.fill_between(
+        ax.fill_between(
             args.test_n_range,
-            mean_mse_unnormalized - std_mse_unnormalized,
-            mean_mse_unnormalized + std_mse_unnormalized,
+            np.min(log_mse_normalized_list, axis=0),
+            np.max(log_mse_normalized_list, axis=0),
             alpha=0.3,
+            color=ibm_colors[0],
         )
-        plt.xlabel('Test set size (N)')
-        plt.ylabel("log(Test MSE)")
-        plt.ylim(-10, 9)
-        plt.title(f'Task {params["task_id"]}')
-        plt.legend()
-        plt.savefig(os.path.join(params["log_dir"], f"task{params['task_id']}_plot.png"))
-        plt.close()
+        ax.plot(
+            args.test_n_range, mean_mse_unnormalized, "o-", label="DeepSet", color=ibm_colors[3]
+        )
+        ax.fill_between(
+            args.test_n_range,
+            np.min(log_mse_unnormalized_list, axis=0),
+            np.max(log_mse_unnormalized_list, axis=0),
+            alpha=0.3,
+            color=ibm_colors[3],
+        )
+        ax.set_xlabel("Test set size (N)", fontsize=18)
+        ax.set_ylabel("log(Test MSE)", fontsize=18)
+        ax.set_xticks(args.test_n_range)
+        ax.tick_params(axis="x", labelsize=10)
+        ax.tick_params(axis="y", labelsize=14)
+        ax.legend(fontsize=16, loc="upper right")
+        ax.set_title(f"{titles[task_id]}", fontsize=18)
+
+        # plot output
+        data = PopStatsDataModule(
+            data_dir=params["data_dir"],
+            task_id=params["task_id"],
+            batch_size=params["batch_size"],
+            training_size=params["training_size"],
+        )
+        data.setup()
+        truth = data.truth
+        test_out_normalized = results[f"task{task_id}"]["normalized"]["0"]["output"]
+        test_out_unnormalized = results[f"task{task_id}"]["unnormalized"]["0"]["output"]
+
+        ax = axes[1, task_id - 1]
+        ax.plot(truth.t, truth.y, label="truth")
+        ax.plot(
+            test_out_unnormalized[0],
+            test_out_unnormalized[1],
+            "x",
+            label="DeepSet",
+            color=ibm_colors[3],
+        )
+        ax.plot(
+            test_out_normalized[0],
+            test_out_normalized[1],
+            "x",
+            label="Normalized DeepSet",
+            color=ibm_colors[0],
+        )
+        ax.set_xlabel(xlabels[task_id], fontsize=18)
+        ax.set_ylabel(ylabels[task_id], fontsize=18)
+        ax.tick_params(axis="x", labelsize=14)
+        ax.tick_params(axis="y", labelsize=14)
+        ax.legend(loc="upper right", fontsize=16)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(params["log_dir"], "deepset_plot.png"))
+    plt.close()

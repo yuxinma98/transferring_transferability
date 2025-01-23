@@ -132,7 +132,9 @@ def train(params, stopping_threshold=False):
         logger.experiment.unwatch(model)
     trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
 
+    model.eval()
     test_data = data.test_dataset
-    y_pred = model.predict(test_data.X)
-    y_pred_out = [test_data.t.tolist(), y_pred.tolist()]
+    with torch.no_grad():
+        y_pred = model.predict(test_data.X)
+        y_pred_out = [test_data.t.tolist(), y_pred.squeeze().tolist()]
     return model, y_pred_out
