@@ -8,6 +8,7 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from model import SiameseRegressor
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 import matplotlib
 import matplotlib.pyplot as plt
 from torchmetrics.regression import SpearmanCorrCoef
@@ -19,6 +20,13 @@ def train(params):
     data = GWLBDataModule(
         fname=f"{params['data_dir']}/GWLB_points{params['point_cloud_size']}_classes[2, 7].pkl",
     )
+    model_checkpoint = ModelCheckpoint(
+        filename="{epoch}-{step}-{val_loss:.2f}",
+        save_last=True,
+        mode="min",
+        monitor="train_loss",
+    )
+
     if params["logger"]:
         logger = WandbLogger(
             project=params["project"],
@@ -27,8 +35,10 @@ def train(params):
             save_dir=params["log_dir"],
         )
         logger.watch(model, log=params["log_model"], log_freq=50)
+
     trainer = pl.Trainer(
         devices=1,
+        callbacks=[model_checkpoint],
         max_epochs=params["max_epochs"],
         logger=logger if params["logger"] else None,
         enable_progress_bar=True,
@@ -36,9 +46,26 @@ def train(params):
     trainer.fit(model, datamodule=data)
     if params["logger"]:
         logger.experiment.unwatch(model)
-    trainer.test(model, datamodule=data, verbose=True)
+    trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
     wandb.finish()
-    return model
+
+    if (
+        params["training_seed"] == 0 and params["name"] != "oids_transferability"
+    ):  # only record outputs for the first trial
+        train_data = data.X_train
+        test_data = data.X_test
+        large_n_data = GWLBDataModule(
+            fname=f"{params['data_dir']}/GWLB_points500_classes[2, 7].pkl",
+        )
+        large_n_data.prepare_data()
+        model.eval()
+        with torch.no_grad():
+            train_pred = model.predict(train_data)
+            test_pred = model.predict(test_data)
+            test_pred_large_n = model.predict(large_n_data.X_test)
+        return model, train_pred, test_pred, test_pred_large_n
+    else:
+        return model, None, None, None
 
 
 class GWLBDataModule(pl.LightningDataModule):
@@ -72,8 +99,7 @@ class GWLBDataModule(pl.LightningDataModule):
         S = torch.matmul(X.transpose(1, 2), X)  # num_pointclouds x 3 x 3
         U, _, _ = torch.svd(S)  # num_pointclouds x 3 x 3
         S = torch.matmul(X, U)  # num_pointclouds x num_points x 3
-        S_sorted, _ = torch.sort(S, dim=-1)
-        return S_sorted
+        return S
 
     def train_dataloader(self):
         return DataLoader(
