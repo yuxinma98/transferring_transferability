@@ -11,7 +11,13 @@ from train import train
 from data import SubsampledDataset
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
+ibm_colors = [
+    "#648FFF",  # Blue
+    "#785EF0",  # Purple
+    "#DC267F",  # Pink
+    "#FE6100",  # Orange
+    "#FFB000",  # Yellow
+]
 
 def nrange(value: Union[str, list]) -> list:
     if isinstance(value, list):
@@ -24,15 +30,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment set-up
     parser.add_argument("--training_size", type=int, default=500, help="Set size of training data")
-    parser.add_argument("--n_samples", type=int, default=1000, help="Number of samples to generate")
+    parser.add_argument("--n_samples", type=int, default=100, help="Number of samples to generate")
     parser.add_argument(
-        "--reference_set_size", type=int, default=int(1e8), help="Reference set size"
+        "--reference_set_size", type=int, default=500, help="Set size of reference data"
     )
     parser.add_argument(
-        "--log_n_range",
+        "--n_range",
         type=nrange,
-        default="1:4:0.2",
-        help="Log range of set sizes",
+        default="500:5000:500",
+        help="Range of set sizes",
     )
 
     # DeepSet model parameters
@@ -53,7 +59,7 @@ if __name__ == "__main__":
         "log_model": None,
         "log_dir": os.path.join(CURRENT_DIR, "log/transferability"),
         # data parameters
-        "data_dir": os.path.join(CURRENT_DIR, "generator/data"),
+        "data_dir": "/export/canton/data/yma93/anydim_transferability/deepset/",
         "training_size": args.training_size,
         "batch_size": 128,
         # model parameters
@@ -78,8 +84,12 @@ if __name__ == "__main__":
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
 
-    model = train(params)
-    model.eval()
+    normalized_model, _, _ = train(params)
+    params["model"]["normalized"] = False
+    unnormalized_model, _, _ = train(params)
+
+    normalized_model.eval()
+    unnormalized_model.eval()
 
     # Load distribution parameter of data
     with h5py.File(os.path.join(params["data_dir"], "task1/matrix_A.mat"), "r") as f:
@@ -90,37 +100,69 @@ if __name__ == "__main__":
     multivariate_normal = torch.distributions.MultivariateNormal(torch.zeros(2), cov)
     X_reference = multivariate_normal.sample((args.reference_set_size,)).unsqueeze(0)
     with torch.no_grad():
-        y_reference = float(model(X_reference).mean(dim=0))
-
-    # subsample from step sample to get X_m
-    subsampled_data = SubsampledDataset(X_reference, n_samples=1, set_size=args.reference_set_size)
-    with torch.no_grad():
-        y_reference = model(subsampled_data[0].unsqueeze(0)).item()
+        normalized_y_reference = float(normalized_model(X_reference))
+        unnormalized_y_reference = float(unnormalized_model(X_reference))
 
     # subsampling from step graphon to get X_n for a range of n
-    n_range = np.power(10, args.log_n_range).astype(int)
-    errors_mean = np.zeros_like(n_range, dtype=float)
+    n_range = np.array(args.n_range).astype(int)
+    normalized_error_mean = np.zeros_like(n_range, dtype=float)
+    normalized_error_std = np.zeros_like(n_range, dtype=float)
+    unnormalized_error_mean = np.zeros_like(n_range, dtype=float)
+    unnormalized_error_std = np.zeros_like(n_range, dtype=float)
     errors_std = np.zeros_like(n_range, dtype=float)
     for i, n in enumerate(n_range):
         subsampled_data = SubsampledDataset(X_reference, n_samples=args.n_samples, set_size=n)
         loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
         with torch.no_grad():
-            y = []
+            normalized_y = []
+            unnormalized_y = []
             for batch in loader:
-                y.append(model(batch))
-        y = torch.cat(y, dim=0)
-        error = torch.abs(y - y_reference)
-        errors_mean[i] = float(error.mean(dim=0).squeeze())
-        errors_std[i] = float(error.std(dim=0).squeeze())
+                normalized_y.append(normalized_model(batch))
+                unnormalized_y.append(unnormalized_model(batch))
+        normalized_y = torch.cat(normalized_y, dim=0)
+        unnormalized_y = torch.cat(unnormalized_y, dim=0)
+        normalized_error = torch.abs(normalized_y - normalized_y_reference)
+        unnormalized_error = torch.abs(unnormalized_y - unnormalized_y_reference)
+        normalized_error_mean[i] = float(normalized_error.mean(dim=0).squeeze())
+        normalized_error_std[i] = float(normalized_error.std(dim=0).squeeze())
+        unnormalized_error_mean[i] = float(unnormalized_error.mean(dim=0).squeeze())
+        unnormalized_error_std[i] = float(unnormalized_error.std(dim=0).squeeze())
 
-    # plot
-    plt.figure()
-    plt.errorbar(n_range, errors_mean, errors_std, fmt="o", capsize=3, markersize=5)
-    reference = n_range ** (-0.5) * n_range[0] ** (0.5) * errors_mean[0]
-    plt.plot(n_range, reference, label="$n^{-0.5}$")
-    plt.xlabel("Set size $n$")
-    plt.ylabel("$|f_n(x) - f_m(x)|$")
+    plt.rcParams.update({"font.size": 18})  # Adjust font size as needed
+    plt.figure(figsize=(8, 6))  # Adjust figure size as needed
+
+    plt.errorbar(
+        n_range,
+        normalized_error_mean,
+        errors_std,
+        capsize=10,
+        markersize=10,
+        elinewidth=2,
+        fmt="o",
+        color=ibm_colors[0],
+        label="Normalized DeepSet",
+        linestyle="none",
+    )
+    plt.errorbar(
+        n_range,
+        unnormalized_error_mean,
+        errors_std,
+        capsize=10,
+        markersize=10,
+        elinewidth=2,
+        fmt="o",
+        color=ibm_colors[3],
+        label="DeepSet",
+        linestyle="none",
+    )
+    reference = n_range ** (-0.5) * n_range[0] ** (0.5) * normalized_error_mean[0]
+    plt.plot(n_range, reference, label="$N^{-0.5}$", color="black", linestyle="--")
+    plt.xlabel("Set size $N$")
+    plt.ylabel("$|f_N(X_N) - f_{\infty}(\mu)|$")
     plt.legend()
     plt.xscale("log")
     plt.yscale("log")
-    plt.savefig(os.path.join(params["log_dir"], "transferability.png"))
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    plt.savefig(os.path.join(params["log_dir"], "deepset_transferability.png"))
+    plt.savefig(os.path.join(params["log_dir"], "deepset_transferability.pdf"))

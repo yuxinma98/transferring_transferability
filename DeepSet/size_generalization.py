@@ -5,7 +5,6 @@ from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
 import numpy as np
 from data import PopStatsDataset
-import matplotlib
 
 from train import train
 from data import PopStatsDataModule
@@ -76,6 +75,7 @@ if __name__ == "__main__":
         # data parameters
         "data_dir": "/export/canton/data/yma93/anydim_transferability/deepset/",
         "training_size": args.training_size,
+        "test_n_range": args.test_n_range,
         "batch_size": 128,
         # model parameters
         "model": {
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     except:
         results = {}
 
-    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    fig, axes = plt.subplots(3, 4, figsize=(20, 10))
     titles = {
         1: "Task1: Rotation",
         2: "Task2: Correlation",
@@ -126,23 +126,26 @@ if __name__ == "__main__":
 
         # run experiments
         for seed in range(args.num_trials):  # run multiple trials
+            params["training_seed"] = seed
             if str(seed) not in results[f"task{task_id}"]["normalized"]:  # skip if already done
                 params["model"]["normalized"] = True
-                params["training_seed"] = seed
-                model_normalized, test_out_normalized = train(params)
+                model_normalized, test_out, test_out_large_n = train(params)
                 mse_normalized = eval(model_normalized, params, args.test_n_range)
                 results[f"task{task_id}"]["normalized"][str(seed)] = {
                     "mse": mse_normalized,
-                    "output": test_out_normalized,
                 }
+                if seed == 0:
+                    results[f"task{task_id}"]["normalized"]["test_out"] = test_out
+                    results[f"task{task_id}"]["normalized"]["test_out_large_n"] = test_out_large_n
+
             if str(seed) not in results[f"task{task_id}"]["unnormalized"]:
                 params["model"]["normalized"] = False
-                model_unnormalized, test_out_unnormalized = train(params)
+                model_unnormalized, test_out, test_out_large_n = train(params)
                 mse_unnormalized = eval(model_unnormalized, params, args.test_n_range)
-                results[f"task{task_id}"]["unnormalized"][str(seed)] = {
-                    "mse": mse_unnormalized,
-                    "output": test_out_unnormalized,
-                }
+                results[f"task{task_id}"]["unnormalized"][str(seed)] = {"mse": mse_unnormalized}
+                if seed == 0:
+                    results[f"task{task_id}"]["unnormalized"]["test_out"] = test_out
+                    results[f"task{task_id}"]["unnormalized"]["test_out_large_n"] = test_out_large_n
             with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
                 json.dump(results, f)
 
@@ -200,11 +203,10 @@ if __name__ == "__main__":
         )
         data.setup()
         truth = data.truth
-        test_out_normalized = results[f"task{task_id}"]["normalized"]["0"]["output"]
-        test_out_unnormalized = results[f"task{task_id}"]["unnormalized"]["0"]["output"]
+        test_out_normalized = results[f"task{task_id}"]["normalized"]["test_out"]
+        test_out_unnormalized = results[f"task{task_id}"]["unnormalized"]["test_out"]
 
         ax = axes[1, task_id - 1]
-        ax.plot(truth.t, truth.y, label="truth")
         ax.plot(
             test_out_unnormalized[0],
             test_out_unnormalized[1],
@@ -219,6 +221,35 @@ if __name__ == "__main__":
             label="Normalized DeepSet",
             color=ibm_colors[0],
         )
+        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=3)
+        ax.set_xlabel(xlabels[task_id], fontsize=18)
+        ax.set_ylabel(ylabels[task_id], fontsize=18)
+        ax.tick_params(axis="x", labelsize=14)
+        ax.tick_params(axis="y", labelsize=14)
+        ax.legend(loc="upper right", fontsize=16)
+
+        # plot output for large n
+        truth = data.truth
+        test_out_normalized = results[f"task{task_id}"]["normalized"]["test_out_large_n"]
+        test_out_unnormalized = results[f"task{task_id}"]["unnormalized"]["test_out_large_n"]
+
+        ax = axes[2, task_id - 1]
+
+        ax.plot(
+            test_out_unnormalized[0],
+            test_out_unnormalized[1],
+            "x",
+            label="DeepSet",
+            color=ibm_colors[3],
+        )
+        ax.plot(
+            test_out_normalized[0],
+            test_out_normalized[1],
+            "x",
+            label="Normalized DeepSet",
+            color=ibm_colors[0],
+        )
+        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=3)
         ax.set_xlabel(xlabels[task_id], fontsize=18)
         ax.set_ylabel(ylabels[task_id], fontsize=18)
         ax.tick_params(axis="x", labelsize=14)
@@ -227,4 +258,5 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     plt.savefig(os.path.join(params["log_dir"], "deepset_plot.pdf"))
+    plt.savefig(os.path.join(params["log_dir"], "deepset_plot.png"))
     plt.close()

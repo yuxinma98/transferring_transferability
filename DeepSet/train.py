@@ -7,7 +7,7 @@ import wandb
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from model import DeepSet
-from data import PopStatsDataModule
+from data import PopStatsDataModule, PopStatsDataset
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
@@ -131,10 +131,22 @@ def train(params, stopping_threshold=False):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
-
-    model.eval()
-    test_data = data.test_dataset
-    with torch.no_grad():
-        y_pred = model.predict(test_data.X)
-        y_pred_out = [test_data.t.tolist(), y_pred.squeeze().tolist()]
-    return model, y_pred_out
+    if params["training_seed"] == 0 and params["name"] != "deepset_transferability":
+        model.eval()
+        test_data = data.test_dataset
+        test_data_large_n = PopStatsDataset(
+            fname=os.path.join(
+                params["data_dir"], f'task{params["task_id"]}/test_{params["test_n_range"][-1]}.mat'
+            )
+        )
+        with torch.no_grad():
+            y_pred = model.predict(test_data.X)
+            y_pred_out = [test_data.t.tolist(), y_pred.squeeze().tolist()]
+            y_pred_large = model.predict(test_data_large_n.X)
+            y_pred_out_large = [
+                test_data_large_n.t.tolist(),
+                y_pred_large.squeeze().tolist(),
+            ]
+        return model, y_pred_out, y_pred_out_large
+    else:
+        return model, None, None
