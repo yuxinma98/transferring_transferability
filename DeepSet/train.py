@@ -3,13 +3,11 @@ import torch.nn as nn
 import pytorch_lightning as pl
 import matplotlib
 import os
-import wandb
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from model import DeepSet
-from data import PopStatsDataModule, PopStatsDataset
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
+from .model import DeepSet
+from .data import PopStatsDataModule, PopStatsDataset
 
 class DeepSetTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:

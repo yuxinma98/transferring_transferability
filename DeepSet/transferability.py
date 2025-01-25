@@ -3,34 +3,39 @@ import argparse
 import os
 import numpy as np
 import h5py
-from typing import Union
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
-from train import train
-from data import SubsampledDataset
+from .train import train
+from .data import SubsampledDataset
+from .. import nrange
+from . import color_dict
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-ibm_colors = [
-    "#648FFF",  # Blue
-    "#785EF0",  # Purple
-    "#DC267F",  # Pink
-    "#FE6100",  # Orange
-    "#FFB000",  # Yellow
-]
 
-def nrange(value: Union[str, list]) -> list:
-    if isinstance(value, list):
-        return value
-    if isinstance(value, str):
-        return list(np.arange(*map(float, value.split(":"))))
+
+def eval(model, n_range, X_reference, y_reference, n_samples, params):
+    error_mean = np.zeros_like(n_range, dtype=float)
+    error_std = np.zeros_like(n_range, dtype=float)
+    for i, n in enumerate(n_range):
+        subsampled_data = SubsampledDataset(X_reference, n_samples=n_samples, set_size=n)
+        loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
+        with torch.no_grad():
+            out = []
+            for batch in loader:
+                out.append(model(batch))
+        out = torch.cat(out, dim=0)
+        error = torch.abs(out - y_reference)
+        error_mean[i] = float(error.mean(dim=0).squeeze())
+        error_std[i] = float(error.std(dim=0).squeeze())
+    return error_mean, error_std
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment set-up
     parser.add_argument("--training_size", type=int, default=500, help="Set size of training data")
-    parser.add_argument("--n_samples", type=int, default=100, help="Number of samples to generate")
+    parser.add_argument("--n_samples", type=int, default=1000, help="Number of samples to generate")
     parser.add_argument(
         "--reference_set_size", type=int, default=500, help="Set size of reference data"
     )
@@ -70,7 +75,6 @@ if __name__ == "__main__":
             "feature_extractor_num_layers": args.num_layers,
             "regressor_num_layers": args.num_layers,
             "num_layers": args.num_layers,
-            "normalized": True,
         },
         # training parameters
         "lr": args.lr,
@@ -84,79 +88,56 @@ if __name__ == "__main__":
     if not os.path.exists(params["data_dir"]):
         os.makedirs(params["data_dir"])
 
-    normalized_model, _, _ = train(params)
-    params["model"]["normalized"] = False
-    unnormalized_model, _, _ = train(params)
+    params["model"]["normalization"] = "mean"
+    normalized_ds, _, _ = train(params)
+    params["model"]["normalization"] = "sum"
+    unnormalized_ds, _, _ = train(params)
+    params["model"]["normalization"] = "max"
+    pointnet, _, _ = train(params)
 
-    normalized_model.eval()
-    unnormalized_model.eval()
-
-    # Load distribution parameter of data
+    models = {
+        "Normalized DeepSet": normalized_ds,
+        "DeepSet": unnormalized_ds,
+        "PointNet": pointnet,
+    }
+    # Load distribution parameter Sigma of task 1
     with h5py.File(os.path.join(params["data_dir"], "task1/matrix_A.mat"), "r") as f:
         A = torch.tensor(f["A"][()], dtype=torch.float32)
         cov = A @ A.T
 
-    # Take a large sample, use as step graphon
+    # Take a reference set, and use its empirical distribution to sample X_n
     multivariate_normal = torch.distributions.MultivariateNormal(torch.zeros(2), cov)
     X_reference = multivariate_normal.sample((args.reference_set_size,)).unsqueeze(0)
+    y_reference = {}
     with torch.no_grad():
-        normalized_y_reference = float(normalized_model(X_reference))
-        unnormalized_y_reference = float(unnormalized_model(X_reference))
+        y_reference["Normalized DeepSet"] = float(normalized_ds(X_reference))
+        y_reference["DeepSet"] = float(unnormalized_ds(X_reference))
+        y_reference["PointNet"] = float(pointnet(X_reference))
 
-    # subsampling from step graphon to get X_n for a range of n
+    # subsample to get X_n for a range of n
     n_range = np.array(args.n_range).astype(int)
-    normalized_error_mean = np.zeros_like(n_range, dtype=float)
-    normalized_error_std = np.zeros_like(n_range, dtype=float)
-    unnormalized_error_mean = np.zeros_like(n_range, dtype=float)
-    unnormalized_error_std = np.zeros_like(n_range, dtype=float)
-    errors_std = np.zeros_like(n_range, dtype=float)
-    for i, n in enumerate(n_range):
-        subsampled_data = SubsampledDataset(X_reference, n_samples=args.n_samples, set_size=n)
-        loader = DataLoader(subsampled_data, batch_size=params["batch_size"], shuffle=False)
-        with torch.no_grad():
-            normalized_y = []
-            unnormalized_y = []
-            for batch in loader:
-                normalized_y.append(normalized_model(batch))
-                unnormalized_y.append(unnormalized_model(batch))
-        normalized_y = torch.cat(normalized_y, dim=0)
-        unnormalized_y = torch.cat(unnormalized_y, dim=0)
-        normalized_error = torch.abs(normalized_y - normalized_y_reference)
-        unnormalized_error = torch.abs(unnormalized_y - unnormalized_y_reference)
-        normalized_error_mean[i] = float(normalized_error.mean(dim=0).squeeze())
-        normalized_error_std[i] = float(normalized_error.std(dim=0).squeeze())
-        unnormalized_error_mean[i] = float(unnormalized_error.mean(dim=0).squeeze())
-        unnormalized_error_std[i] = float(unnormalized_error.std(dim=0).squeeze())
-
     plt.rcParams.update({"font.size": 18})  # Adjust font size as needed
     plt.figure(figsize=(8, 6))  # Adjust figure size as needed
-
-    plt.errorbar(
-        n_range,
-        normalized_error_mean,
-        errors_std,
-        capsize=10,
-        markersize=10,
-        elinewidth=2,
-        fmt="o",
-        color=ibm_colors[0],
-        label="Normalized DeepSet",
-        linestyle="none",
-    )
-    plt.errorbar(
-        n_range,
-        unnormalized_error_mean,
-        errors_std,
-        capsize=10,
-        markersize=10,
-        elinewidth=2,
-        fmt="o",
-        color=ibm_colors[3],
-        label="DeepSet",
-        linestyle="none",
-    )
-    reference = n_range ** (-0.5) * n_range[0] ** (0.5) * normalized_error_mean[0]
-    plt.plot(n_range, reference, label="$N^{-0.5}$", color="black", linestyle="--")
+    for model_name, model in models.items():
+        model.eval()
+        error_mean, error_std = eval(
+            model, n_range, X_reference, y_reference[model_name], args.n_samples, params
+        )
+        plt.errorbar(
+            n_range,
+            error_mean,
+            error_std,
+            capsize=10,
+            markersize=10,
+            elinewidth=2,
+            fmt="o",
+            color=color_dict[model_name],
+            label=model_name,
+            linestyle="none",
+        )
+        if model_name == "Normalized DeepSet":
+            reference = n_range ** (-0.5) * n_range[0] ** (0.5) * error_mean[0]
+            plt.plot(n_range, reference, label="$N^{-0.5}$", color="black", linestyle="--")
     plt.xlabel("Set size $N$")
     plt.ylabel("$|f_N(X_N) - f_{\infty}(\mu)|$")
     plt.legend()

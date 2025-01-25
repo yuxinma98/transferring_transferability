@@ -3,16 +3,19 @@ import torch.nn as nn
 
 class DeepSet(nn.Module):
 
-    def __init__(self, in_channels: int=1, 
-                 out_channels: int=1,
-                 hidden_channels: int=50,
-                 set_channels: int=50,
-                 feature_extractor_num_layers: int=3,
-                 regressor_num_layers: int=4,
-                 normalized: bool=True,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        in_channels: int = 1,
+        out_channels: int = 1,
+        hidden_channels: int = 50,
+        set_channels: int = 50,
+        feature_extractor_num_layers: int = 3,
+        regressor_num_layers: int = 4,
+        normalization: str = None,
+        **kwargs
+    ) -> None:
         super(DeepSet, self).__init__()
-        self.normalized = normalized
+        self.normalization = normalization
 
         # Feature extractor
         feature_extractor_layers = [nn.Linear(in_channels, hidden_channels)]
@@ -46,9 +49,11 @@ class DeepSet(nn.Module):
         """
         x = input # B x N x in_channels
         x = self.feature_extractor(x) # B x N x set_channels
-        if self.normalized:
+        if self.normalization == "mean":
             x = x.mean(dim=1) # B x set_channels
-        else:
+        elif self.normalization == "max":
+            x = x.max(dim=1).values
+        elif self.normalization == "sum" or self.normalization is None:
             x = x.sum(dim=1) # B x set_channels
         x = self.regressor(x) # B x out_channels
         return x
