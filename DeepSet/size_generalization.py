@@ -48,7 +48,7 @@ def train_and_eval(params, args, model_name):
 
 
 def plot_results(results):
-    fig, axes = plt.subplots(3, 4, figsize=(20, 10))
+    fig, axes = plt.subplots(3, 4, figsize=(20, 13))
     titles = {
         1: "Task1: Rotation",
         2: "Task2: Correlation",
@@ -62,7 +62,7 @@ def plot_results(results):
         4: "Mutual information",
     }
     xlabels = {1: "Rotation Angle", 2: "Correlation", 3: "Rank-1 Length", 4: "Sorted Index"}
-
+    subsample_size = 100
     for task_id in [1, 2, 3, 4]:
         # plot MSE
         ax = axes[0, task_id - 1]
@@ -91,13 +91,13 @@ def plot_results(results):
         ax.set_xticks(args.test_n_range)
         ax.tick_params(axis="x", labelsize=10)
         ax.tick_params(axis="y", labelsize=14)
-        ax.legend(fontsize=16, loc="upper right")
+        ax.legend(fontsize=12, loc="upper right")
         ax.set_title(f"{titles[task_id]}", fontsize=18)
 
         # plot predictions
         data = PopStatsDataModule(
             data_dir=params["data_dir"],
-            task_id=params["task_id"],
+            task_id=task_id,
             batch_size=params["batch_size"],
             training_size=params["training_size"],
         )
@@ -106,32 +106,49 @@ def plot_results(results):
         ax = axes[1, task_id - 1]
         for model_name in normalizations.keys():
             test_out = results[f"task{task_id}"][model_name]["test_out"]
+            indices = np.random.choice(
+                len(test_out[0]), subsample_size, replace=False
+            )  # subsample for visualization
+            subsampled_x = np.array(test_out[0])[indices]
+            subsampled_y = np.array(test_out[1])[indices]
             ax.plot(
-                test_out[0],
-                test_out[1],
+                subsampled_x,
+                subsampled_y,
                 "x",
                 label=model_name,
                 color=color_dict[model_name],
             )
-        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=3)
+
+        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=2)
         ax.set_xlabel(xlabels[task_id], fontsize=18)
         ax.set_ylabel(ylabels[task_id], fontsize=18)
         ax.tick_params(axis="x", labelsize=14)
         ax.tick_params(axis="y", labelsize=14)
-        ax.legend(loc="upper right", fontsize=16)
+        ax.legend(loc="upper right", fontsize=12)
 
         # plot predictions for large n
-        truth = data.truth
         ax = axes[2, task_id - 1]
         for model_name in normalizations.keys():
-            test_out = results[f"task{task_id}"]["normalized"]["test_out_large_n"]
-            ax.plot(test_out[0], test_out[1], "x", label=model_name, color=color_dict[model_name])
-        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=3)
+            test_out = results[f"task{task_id}"][model_name]["test_out_large_n"]
+            indices = np.random.choice(
+                len(test_out[0]), subsample_size, replace=False
+            )  # subsample for visualization
+            subsampled_x = np.array(test_out[0])[indices]
+            subsampled_y = np.array(test_out[1])[indices]
+            ax.plot(
+                subsampled_x,
+                subsampled_y,
+                "x",
+                label=model_name,
+                color=color_dict[model_name],
+            )
+
+        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=2)
         ax.set_xlabel(xlabels[task_id], fontsize=18)
         ax.set_ylabel(ylabels[task_id], fontsize=18)
         ax.tick_params(axis="x", labelsize=14)
         ax.tick_params(axis="y", labelsize=14)
-        ax.legend(loc="upper right", fontsize=16)
+        ax.legend(loc="upper right", fontsize=12)
 
     plt.tight_layout()
     plt.savefig(os.path.join(params["log_dir"], "deepset_plot.pdf"))
@@ -201,8 +218,8 @@ if __name__ == "__main__":
         results = {}
 
     normalizations = {
-        "Normalized DeepSet": "mean",
         "DeepSet": "sum",
+        "Normalized DeepSet": "mean",
         "PointNet": "max",
     }
     for models in normalizations.keys():
