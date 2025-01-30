@@ -6,8 +6,8 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .train import train, GWLBDataModule
-from . import color_dict, data_dir
+from Anydim_transferability.O_n.train import train, GWLBDataModule
+from Anydim_transferability.O_n import color_dict, data_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,7 +28,7 @@ def eval(model, params):
         )
         data.prepare_data()
         with torch.no_grad():
-            y_pred = model.predict(data.X_test.to(model.device))
+            y_pred = model.predict(data.X_test)
         test_mse.append(float(mse(y_pred, data.dist_true_test.to(model.device))))
         test_rank_corr.append(
             float(
@@ -257,7 +257,7 @@ if __name__ == "__main__":
             "out_dim": 16,
         },
         "DS-CI (Normalized)": {"hid_dim": 10, "out_dim": 10},
-        "OI-DS (Normalized)": {"hid_dim": 16, "out_dim": 16},
+        "OI-DS (Normalized)": {"hid_dim": 12, "out_dim": 12},
     }
     test_n_range = [20, 100, 200, 300, 500]
     for model_name in model_params.keys():

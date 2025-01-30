@@ -3,7 +3,8 @@ import torch.nn as nn
 from torchmetrics.functional.pairwise import pairwise_euclidean_distance
 from torch_geometric.nn.models import MLP
 
-from ..DeepSet.model import DeepSet
+from Anydim_transferability.DeepSet.model import DeepSet
+
 
 class SiameseRegressor(torch.nn.Module):
     def __init__(self, params):
@@ -75,8 +76,8 @@ class ScalarModel_KMeans(torch.nn.Module):
             net.reset_parameters()
 
     def forward(self, data):
-        out_d = self.MLP_km(data.f_d, data.f_d_batch)  # bs x hid_dim
-        out_o = self.deepset_o(data.f_o, data.f_o_batch)  # bs x hid_dim
+        out_d = self.MLP_km(data.f_d)  # bs x hid_dim
+        out_o = self.deepset_o(data.f_o)  # bs x hid_dim
         # concat and output final embedding
         out = self.MLP_out(torch.concat([out_d, out_o], dim=-1))  # bs x hid_dim*2 -> bs x out_dim
         return out

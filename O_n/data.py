@@ -44,12 +44,8 @@ class GWLBDataModule(pl.LightningDataModule):
             self.X_test = [self._get_fs(X1_test), self._get_fs(X2_test)]
 
         elif self.model_name == "OI-DS (Normalized)":
-            X1_train = [self._get_Kmeans(X1_train[i]) for i in range(X1_train.shape[0])]
-            X2_train = [self._get_Kmeans(X2_train[i]) for i in range(X2_train.shape[0])]
-            X1_test = [self._get_Kmeans(X1_test[i]) for i in range(X1_test.shape[0])]
-            X2_test = [self._get_Kmeans(X2_test[i]) for i in range(X2_test.shape[0])]
-            self.X_train = X1_train + X2_train
-            self.X_test = X1_test + X2_test
+            self.X_train = [self._get_Kmeans(X1_train), self._get_Kmeans(X2_train)]
+            self.X_test = [self._get_Kmeans(X1_test), self._get_Kmeans(X2_test)]
 
     def _svd(self, X: torch.Tensor) -> torch.Tensor:
         """
@@ -90,25 +86,33 @@ class GWLBDataModule(pl.LightningDataModule):
         )  # num_pointclouds x 1
         return data
 
-    def _get_Kmeans(self, X, k=3):
-        """
-        Implement eqn 6: replace f_d as the self-dots of the K-means dots
-        input: X (n by 3), k: number of k-means clusters
-        output: Data (class) storing  feature matrix
-        f_d is the flattened feature of the gram matrix of K-means centroids
-        f_o is the set of dot products of each point to the K-means centroids
-        """
-        n = X.shape[0]
-        data = Data()
+    def _get_Kmeans(self, X: torch.Tensor, k: int = 3) -> Data:
+        """Implement eqn 6: replace f_d as the self-dots of the K-means dots
 
-        kmeans = KMeans(n_clusters=k, random_state=0, init="k-means++", n_init=1).fit(X)
-        K = kmeans.cluster_centers_  # (num_centroids, 3)
-        # sort Kmeans centroid by norm
-        indexlist = np.argsort(np.linalg.norm(K, axis=1))
-        K = K[indexlist, :]
-        data.f_o = torch.FloatTensor(X @ K.T)  # shape(n, d)
-        Gram_k = torch.FloatTensor(K @ K.T)  # shape (d, d)
-        data.f_d = Gram_k.reshape(1, k * k)  # shape (d^2,)
+        Args:
+            X (torch.Tensor): num_pointclouds x num_points x 3
+            k (int, optional): K in K-means. Defaults to 3.
+
+        Returns:
+            Data: Data object with f_d, f_o
+            f_d is the flattened feature of the gram matrix of K-means centroids
+            f_o is the set of dot products of each point to the K-means centroids
+        """
+        num_pointclouds = X.shape[0]
+        n = X.shape[1]
+        K_all = np.zeros((num_pointclouds, k, 3))
+        data = Data()
+        for i in range(num_pointclouds):
+            kmeans = KMeans(n_clusters=k, random_state=0, init="k-means++", n_init=1).fit(X[i])
+            K = kmeans.cluster_centers_  # (num_centroids, 3)
+            # sort Kmeans centroid by norm
+            indexlist = np.argsort(np.linalg.norm(K, axis=1))
+            K = K[indexlist, :]
+            K_all[i] = K
+        K_all = torch.FloatTensor(K_all)
+        data.f_o = torch.matmul(X, K_all.transpose(1, 2))  # num_pointclouds x n x k
+        Gram_k = torch.matmul(K_all, K_all.transpose(1, 2))  # num_pointclouds x k x k
+        data.f_d = Gram_k.reshape(num_pointclouds, k * k)  # num_pointclouds x k^2
         return data
 
     def train_dataloader(self):
