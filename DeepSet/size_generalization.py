@@ -4,9 +4,9 @@ import json
 from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
 import numpy as np
-from .train import train
-from .data import PopStatsDataModule, PopStatsDataset
-from . import color_dict, data_dir
+from Anydim_transferability.DeepSet.train import train
+from Anydim_transferability.DeepSet.data import PopStatsDataModule, PopStatsDataset
+from Anydim_transferability.DeepSet import color_dict, data_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -86,7 +86,7 @@ def plot_results(results):
                 alpha=0.3,
                 color=color_dict[model_name],
             )
-        ax.set_xlabel("Test set size (N)", fontsize=18)
+        ax.set_xlabel("Test set size (M)", fontsize=18)
         ax.set_ylabel("log(Test MSE)", fontsize=18)
         ax.set_xticks(args.test_n_range)
         ax.tick_params(axis="x", labelsize=10)

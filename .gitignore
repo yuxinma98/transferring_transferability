@@ -14,3 +14,5 @@ GNN_size_generalizability/data
 O(n)/__pycache__
 O(n)/log
 __pycache__
+O_n/log
+O_n/__pycache__
