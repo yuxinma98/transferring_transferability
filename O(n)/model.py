@@ -1,13 +1,39 @@
 import torch
 import torch.nn as nn
 from torchmetrics.functional.pairwise import pairwise_euclidean_distance
+from torch_geometric.nn.models import MLP
 
+from ..DeepSet.model import DeepSet
 
 class SiameseRegressor(torch.nn.Module):
     def __init__(self, params):
         super(SiameseRegressor, self).__init__()
-        self.SM = DeepSet(in_channels=3, **params)
-        self.metric = nn.Linear(params["out_channels"], params["out_channels"], bias=False)
+        self.params = params
+        if params["model_name"] == "SVD-DeepSet":
+            self.SM = DeepSet(
+                in_channels=3,
+                out_channels=params["out_dim"],
+                hidden_channels=params["hid_dim"],
+                set_channels=params["hid_dim"] * 2,
+                feature_extractor_num_layers=3,
+                regressor_num_layers=2,
+                normalization="sum",
+            )
+        elif params["model_name"] == "SVD-Normalized DeepSet":
+            self.SM = DeepSet(
+                in_channels=3,
+                out_channels=params["out_dim"],
+                hidden_channels=params["hid_dim"],
+                set_channels=params["hid_dim"] * 2,
+                feature_extractor_num_layers=3,
+                regressor_num_layers=2,
+                normalization="mean",
+            )
+        elif params["model_name"] == "DS-CI (Normalized)":
+            self.SM = ScalarModel(**params)
+        elif params["model_name"] == "OI-DS (Normalized)":
+            self.SM = ScalarModel_KMeans(**params)
+        self.metric = nn.Linear(params["out_dim"], params["out_dim"], bias=False)
         self.linear = nn.Linear(1, 1)
 
     def forward(self, x1, x2):
@@ -21,68 +47,84 @@ class SiameseRegressor(torch.nn.Module):
         return dist_pred
 
 
-class DeepSet(nn.Module):
-
-    def __init__(
-        self,
-        in_channels: int = 1,
-        out_channels: int = 1,
-        hidden_channels: int = 50,
-        set_channels: int = 50,
-        feature_extractor_num_layers: int = 3,
-        regressor_num_layers: int = 4,
-        normalized: bool = True,
-        **kwargs,
-    ) -> None:
-        super(DeepSet, self).__init__()
-        self.normalized = normalized
-
-        # Feature extractor
-        feature_extractor_layers = [nn.Linear(in_channels, hidden_channels)]
-        for _ in range(feature_extractor_num_layers - 2):
-            feature_extractor_layers.append(nn.ELU(inplace=True))
-            feature_extractor_layers.append(nn.Linear(hidden_channels, hidden_channels))
-        feature_extractor_layers.append(nn.ELU(inplace=True))
-        feature_extractor_layers.append(nn.Linear(hidden_channels, set_channels))
-        self.feature_extractor = nn.Sequential(*feature_extractor_layers)
-
-        # Regressor
-        if regressor_num_layers == 1:
-            self.regressor = nn.Sequential(nn.Linear(set_channels, out_channels))
-        else:
-            regressor_layers = [nn.Linear(set_channels, hidden_channels)]
-            for _ in range(regressor_num_layers - 2):
-                regressor_layers.append(nn.ELU(inplace=True))
-                regressor_layers.append(nn.Linear(hidden_channels, hidden_channels))
-            regressor_layers.append(nn.ELU(inplace=True))
-            regressor_layers.append(nn.Linear(hidden_channels, out_channels))
-            self.regressor = nn.Sequential(*regressor_layers)
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
+class ScalarModel_KMeans(torch.nn.Module):
+    def __init__(self, hid_dim, out_dim, dropout=0, input_dim=9, input_off=3, **kwargs):
         """
-
-        Args:
-            input (torch.Tensor): B x N x in_channels
-
-        Returns:
-            torch.Tensor: B x out_channels
+        input_dim = d^2
+        input_off = d
         """
-        x = input  # B x N x in_channels
-        x = self.feature_extractor(x)  # B x N x set_channels
-        if self.normalized:
-            x = x.mean(dim=1)  # B x set_channels
-        else:
-            x = x.sum(dim=1)  # B x set_channels
-        x = self.regressor(x)  # B x out_channels
-        return x
-
-    def __repr__(self):
-        return (
-            self.__class__.__name__
-            + "("
-            + "Feature Exctractor="
-            + str(self.feature_extractor)
-            + "\n Set Feature"
-            + str(self.regressor)
-            + ")"
+        super(ScalarModel_KMeans, self).__init__()
+        # MLP for k-means gram matrix, C(Y) C(Y)^T
+        self.MLP_km = MLP([input_dim, input_dim * 2, hid_dim], dropout=[dropout] * 2)
+        # Deepset for k-means features, C(Y) Y (action on the n points in R^d)
+        self.deepset_o = DeepSet(
+            in_channels=input_off,
+            out_channels=hid_dim,
+            hidden_channels=hid_dim,
+            set_channels=hid_dim * 2,
+            feature_extractor_num_layers=3,
+            regressor_num_layers=2,
+            normalization="mean",
         )
+        # MLP for (MLP_km(f_km), Deepset(f_d))
+        self.MLP_out = MLP([hid_dim * 2, hid_dim, out_dim], dropout=[dropout] * 2)
+        self.out_dim = out_dim
+
+    def reset_parameters(self):
+        for net in [self.MLP_km, self.deepset_o, self.MLP_out]:
+            net.reset_parameters()
+
+    def forward(self, data):
+        out_d = self.MLP_km(data.f_d, data.f_d_batch)  # bs x hid_dim
+        out_o = self.deepset_o(data.f_o, data.f_o_batch)  # bs x hid_dim
+        # concat and output final embedding
+        out = self.MLP_out(torch.concat([out_d, out_o], dim=-1))  # bs x hid_dim*2 -> bs x out_dim
+        return out
+
+
+class ScalarModel(torch.nn.Module):
+    def __init__(self, hid_dim, out_dim, dropout=0, input_dim=1, input_off=1, **kwargs):
+        """
+        For all off-diag scalars, input_off = 1
+        """
+        super(ScalarModel, self).__init__()
+        # Deepset for diagonal scalars
+        self.deepset_d = DeepSet(
+            in_channels=input_dim,
+            out_channels=hid_dim,
+            hidden_channels=hid_dim,
+            set_channels=hid_dim * 2,
+            feature_extractor_num_layers=3,
+            regressor_num_layers=2,
+            normalization="mean",
+        )
+        # Deepset for off-diagonal scalars
+        self.deepset_o = DeepSet(
+            in_channels=input_off,
+            out_channels=hid_dim,
+            hidden_channels=hid_dim,
+            set_channels=hid_dim * 2,
+            feature_extractor_num_layers=3,
+            regressor_num_layers=2,
+            normalization="mean",
+        )
+        # MLP_s for f_star
+        self.MLP_s = MLP([input_dim, hid_dim, hid_dim], dropout=[dropout] * 2, norm=None)
+        # MLP for (Deepset(f_d), Deepset(f_o), f_star)
+        self.MLP_out = MLP([hid_dim * 3, hid_dim, out_dim], dropout=[dropout] * 2, norm=None)
+        self.out_dim = out_dim
+
+    def reset_parameters(self):
+        for net in [self.deepset_d, self.deepset_o, self.MLP_s, self.MLP_out]:
+            # for net in [self.deepset_d, self.deepset_o, self.MLP_out]:
+            net.reset_parameters()
+
+    def forward(self, data):
+        out_d = self.deepset_d(data.f_d)  # bs x hid_dim
+        out_o = self.deepset_o(data.f_o)  # bs x hid_dim
+        out_star = self.MLP_s(data.f_star)  # bs x hid_dim
+        # concat and output final embedding
+        out = self.MLP_out(
+            torch.concat([out_d, out_o, out_star], dim=-1)
+        )  # bs x hid_dim*3 -> bs x out_dim
+        return out

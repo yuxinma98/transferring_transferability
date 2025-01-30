@@ -7,8 +7,7 @@ from ott.geometry import costs, distrib_costs
 from ott.solvers.linear import univariate
 from ott.problems.quadratic import quadratic_problem
 from ott.solvers.quadratic import lower_bound
-
-data_dir = "/export/canton/data/yma93/anydim_transferability/OI-DS"
+from . import data_dir
 
 
 def dist_function(xx, yy, wxx, wyy):

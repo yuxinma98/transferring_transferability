@@ -1,24 +1,25 @@
 import wandb
 import os
-import pickle
 import numpy as np
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader
-from model import SiameseRegressor
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 import matplotlib
 import matplotlib.pyplot as plt
 from torchmetrics.regression import SpearmanCorrCoef
 
+from .data import GWLBDataModule
+from .model import SiameseRegressor
 
-def train(params):
+
+def train(params, record_output=False):
     pl.seed_everything(params["training_seed"])
-    model = OIDSTrainingModule(params)
+    model = OdSnTrainingModule(params)
     data = GWLBDataModule(
         fname=f"{params['data_dir']}/GWLB_points{params['point_cloud_size']}_classes[2, 7].pkl",
+        model_name=params["model"]["model_name"],
     )
     model_checkpoint = ModelCheckpoint(
         filename="{epoch}-{step}-{val_loss:.2f}",
@@ -26,7 +27,6 @@ def train(params):
         mode="min",
         monitor="train_loss",
     )
-
     if params["logger"]:
         logger = WandbLogger(
             project=params["project"],
@@ -47,85 +47,28 @@ def train(params):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
+    best_train_loss = model_checkpoint.best_model_score.item()
     wandb.finish()
 
-    if (
-        params["training_seed"] == 0 and params["name"] != "oids_transferability"
-    ):  # only record outputs for the first trial
-        train_data = data.X_train
-        test_data = data.X_test
+    if record_output:  # only record outputs for the first trial
         large_n_data = GWLBDataModule(
-            fname=f"{params['data_dir']}/GWLB_points500_classes[2, 7].pkl",
+            fname=f"{params['data_dir']}/GWLB_points{params['large_point_cloud_size']}_classes[2, 7].pkl",
+            model_name=params["model"]["model_name"],
         )
         large_n_data.prepare_data()
         model.eval()
         with torch.no_grad():
-            train_pred = model.predict(train_data)
-            test_pred = model.predict(test_data)
+            train_pred = model.predict(data.X_train)
+            test_pred = model.predict(data.X_test)
             test_pred_large_n = model.predict(large_n_data.X_test)
-        return model, train_pred, test_pred, test_pred_large_n
+        return model, best_train_loss, train_pred, test_pred, test_pred_large_n
     else:
-        return model, None, None, None
+        return model, best_train_loss, None, None, None
 
 
-class GWLBDataModule(pl.LightningDataModule):
-    def __init__(self, fname):
-        super(GWLBDataModule, self).__init__()
-        self.fname = fname
-
-    def prepare_data(self):
-        xtrain_s, ytrain_s, xtest_s, ytest_s, kernel_train, kernel_test = pickle.load(
-            open(
-                self.fname,
-                "rb",
-            )
-        )
-        xtrain_s = torch.from_numpy(np.array(xtrain_s)).float()
-        xtest_s = torch.from_numpy(np.array(xtest_s)).float()
-        ytrain_s = torch.from_numpy(np.array(ytrain_s)).long().squeeze()
-        ytest_s = torch.from_numpy(np.array(ytest_s)).long().squeeze()
-
-        X1_train = self._svd(xtrain_s[ytrain_s == 2])  # num_pointclouds x num_points x 3
-        X2_train = self._svd(xtrain_s[ytrain_s == 7])
-        self.X_train = torch.stack([X1_train, X2_train], dim=0)
-        X1_test = self._svd(xtest_s[ytest_s == 2])
-        X2_test = self._svd(xtest_s[ytest_s == 7])
-        self.X_test = torch.stack([X1_test, X2_test], dim=0)
-        self.dist_true_train = torch.from_numpy(np.array(kernel_train)).unsqueeze(1)
-        self.dist_true_test = torch.from_numpy(np.array(kernel_test)).unsqueeze(1)
-
-    def _svd(self, X):
-        # X: num_pointclouds x num_points x 3
-        S = torch.matmul(X.transpose(1, 2), X)  # num_pointclouds x 3 x 3
-        U, _, _ = torch.svd(S)  # num_pointclouds x 3 x 3
-        S = torch.matmul(X, U)  # num_pointclouds x num_points x 3
-        return S
-
-    def train_dataloader(self):
-        return DataLoader(
-            self.X_train,
-            batch_size=40,
-            shuffle=False,
-        )
-
-    def val_dataloader(self):
-        return DataLoader(
-            self.X_train,
-            batch_size=40,
-            shuffle=False,
-        )
-
-    def test_dataloader(self):
-        return DataLoader(
-            self.X_test,
-            batch_size=40,
-            shuffle=False,
-        )
-
-
-class OIDSTrainingModule(pl.LightningModule):
+class OdSnTrainingModule(pl.LightningModule):
     def __init__(self, params):
-        super(OIDSTrainingModule, self).__init__()
+        super(OdSnTrainingModule, self).__init__()
         self.save_hyperparameters(params)
         self.params = params
         self.loss = nn.MSELoss()
@@ -133,7 +76,7 @@ class OIDSTrainingModule(pl.LightningModule):
         self.model = SiameseRegressor(params["model"])
 
     def forward(self, data):
-        return self.model(data[0], data[1])
+        return self.model(data[0].to(self.device), data[1].to(self.device))
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -168,7 +111,7 @@ class OIDSTrainingModule(pl.LightningModule):
 
     def on_validation_end(self):
         super().on_validation_end()
-        X_train = self.trainer.datamodule.X_train.to(self.device)
+        X_train = self.trainer.datamodule.X_train
         dist_true_train = self.trainer.datamodule.dist_true_train.to(self.device)
         if self.current_epoch % 50 == 0:
             y_pred = self.predict(X_train).cpu()
@@ -189,7 +132,7 @@ class OIDSTrainingModule(pl.LightningModule):
 
     def on_test_end(self):
         super().on_validation_end()
-        X_test = self.trainer.datamodule.X_test.to(self.device)
+        X_test = self.trainer.datamodule.X_test
         dist_true_test = self.trainer.datamodule.dist_true_test.to(self.device)
         y_pred = self.predict(X_test).cpu()
         self._plot_correlation(
@@ -221,7 +164,7 @@ class OIDSTrainingModule(pl.LightningModule):
         matplotlib.rc("font", **font)
         scale = 0.5
         plt.figure(figsize=(10 * scale, 7.5 * scale))
-        plt.scatter(y_truth, y_pred, label="train (all fs)", alpha=0.75)
+        plt.scatter(y_truth, y_pred, label="train", alpha=0.75)
         plt.plot(
             np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5
         )

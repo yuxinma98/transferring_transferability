@@ -6,30 +6,13 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-from train import train, GWLBDataModule
+from .train import train, GWLBDataModule
+from . import color_dict, data_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-ibm_colors = [
-    "#648FFF",  # Blue
-    "#785EF0",  # Purple
-    "#DC267F",  # Pink
-    "#FE6100",  # Orange
-    "#FFB000",  # Yellow
-]
 
 
-def str2bool(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif value.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
-
-
-def eval(model, params, test_n_range):
+def eval(model, params):
     """
     Evaluate the trained model on test set of different sizes
     """
@@ -41,6 +24,7 @@ def eval(model, params, test_n_range):
     for N in test_n_range:
         data = GWLBDataModule(
             fname=f"{params['data_dir']}/GWLB_points{N}_classes[2, 7].pkl",
+            model_name=params["model"]["model_name"],
         )
         data.prepare_data()
         with torch.no_grad():
@@ -54,57 +38,61 @@ def eval(model, params, test_n_range):
     return test_mse, test_rank_corr
 
 
-def plot_size_generalization(results, params):
-    # plot results
-    log_mse_normalized_list = [
-        np.log(results["normalized"][str(seed)]["mse"]) for seed in range(args.num_trials)
-    ]
-    log_mse_unnormalized_list = [
-        np.log(results["unnormalized"][str(seed)]["mse"]) for seed in range(args.num_trials)
-    ]
-    rank_corr_normalized_list = [
-        results["normalized"][str(seed)]["rank_corr"] for seed in range(args.num_trials)
-    ]
-    rank_corr_unnormalized_list = [
-        results["unnormalized"][str(seed)]["rank_corr"] for seed in range(args.num_trials)
-    ]
+def train_and_eval(params, args, model_name):
+    results.setdefault(model_name, {})
+    seed = 0
+    for trial in range(args.num_trials):  # run multiple trials
+        if str(trial) in results[model_name]:
+            continue
+        record_output = trial == 0
+        best_model = None
+        for i in range(5):  # for each trial, take the best out of 5 random runs
+            seed = trial * 5 + i
+            params["training_seed"] = seed
+            model, train_loss, train_out, test_out, test_out_large_n = train(
+                params, record_output=record_output
+            )
+            if best_model is None or train_loss < best_loss:
+                best_model, best_loss, best_train_out, best_test_out, best_test_out_large_n = (
+                    model,
+                    train_loss,
+                    train_out,
+                    test_out,
+                    test_out_large_n,
+                )
+        mse, rank_corr = eval(best_model, params)
+        results[model_name][str(trial)] = {"mse": mse, "rank_corr": rank_corr}
+        if trial == 0:
+            results[model_name]["train_out"] = best_train_out.squeeze().tolist()
+            results[model_name]["test_out"] = best_test_out.squeeze().tolist()
+            results[model_name]["test_out_large_n"] = best_test_out_large_n.squeeze().tolist()
+        with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
+            json.dump(results, f)
 
+
+def plot_size_generalization(results, params):
     plt.figure(figsize=(14, 5))
 
     # First subplot for Test MSE
     plt.subplot(1, 2, 1)
-    plt.plot(
-        test_n_range,
-        np.median(log_mse_normalized_list, axis=0),
-        "o-",
-        label="Normalized SVD-DeepSet",
-        color=ibm_colors[0],
-    )
-    plt.fill_between(
-        test_n_range,
-        np.median(log_mse_normalized_list, axis=0) - np.std(log_mse_normalized_list, axis=0),
-        np.median(log_mse_normalized_list, axis=0) + np.std(log_mse_normalized_list, axis=0),
-        # np.min(log_mse_normalized_list, axis=0),
-        # np.max(log_mse_normalized_list, axis=0),
-        alpha=0.3,
-        color=ibm_colors[0],
-    )
-    plt.plot(
-        test_n_range,
-        np.median(log_mse_unnormalized_list, axis=0),
-        "o-",
-        label="SVD-DeepSet",
-        color=ibm_colors[3],
-    )
-    plt.fill_between(
-        test_n_range,
-        np.median(log_mse_unnormalized_list, axis=0) - np.std(log_mse_unnormalized_list, axis=0),
-        np.median(log_mse_unnormalized_list, axis=0) + np.std(log_mse_unnormalized_list, axis=0),
-        # np.min(log_mse_unnormalized_list, axis=0),
-        # np.max(log_mse_unnormalized_list, axis=0),
-        alpha=0.3,
-        color=ibm_colors[3],
-    )
+    for model_name in model_params.keys():
+        log_mse = [
+            np.log(results[model_name][str(trial)]["mse"]) for trial in range(args.num_trials)
+        ]
+        plt.plot(
+            test_n_range,
+            np.mean(log_mse, axis=0),
+            "o-",
+            label=model_name,
+            color=color_dict[model_name],
+        )
+        plt.fill_between(
+            test_n_range,
+            np.min(log_mse, axis=0),
+            np.max(log_mse, axis=0),
+            alpha=0.3,
+            color=color_dict[model_name],
+        )
     plt.xlabel("Test point cloud sizes (N)", fontsize=18)
     plt.ylabel("log(Test MSE)", fontsize=18)
     plt.xticks(test_n_range, fontsize=16)
@@ -113,38 +101,25 @@ def plot_size_generalization(results, params):
 
     # Second subplot for Spearman Correlation
     plt.subplot(1, 2, 2)
-    plt.plot(
-        test_n_range,
-        np.median(rank_corr_normalized_list, axis=0),
-        "o-",
-        label="Normalized SVD-DeepSet",
-        color=ibm_colors[0],
-    )
-    plt.fill_between(
-        test_n_range,
-        np.mean(rank_corr_normalized_list, axis=0) - np.std(rank_corr_normalized_list, axis=0),
-        np.mean(rank_corr_normalized_list, axis=0) + np.std(rank_corr_normalized_list, axis=0),
-        # np.min(rank_corr_normalized_list, axis=0),
-        # np.max(rank_corr_normalized_list, axis=0),
-        alpha=0.3,
-        color=ibm_colors[0],
-    )
-    plt.plot(
-        test_n_range,
-        np.median(rank_corr_unnormalized_list, axis=0),
-        "o-",
-        label="SVD-DeepSet",
-        color=ibm_colors[3],
-    )
-    plt.fill_between(
-        test_n_range,
-        np.mean(rank_corr_unnormalized_list, axis=0) - np.std(rank_corr_unnormalized_list, axis=0),
-        np.mean(rank_corr_unnormalized_list, axis=0) + np.std(rank_corr_unnormalized_list, axis=0),
-        # np.min(rank_corr_unnormalized_list, axis=0),
-        # np.max(rank_corr_unnormalized_list, axis=0),
-        alpha=0.3,
-        color=ibm_colors[3],
-    )
+    for model_name in model_params.keys():
+        rank_corr = [
+            results[model_name][str(trial)]["rank_corr"] for trial in range(args.num_trials)
+        ]
+        plt.plot(
+            test_n_range,
+            np.mean(rank_corr, axis=0),
+            "o-",
+            label=model_name,
+            color=color_dict[model_name],
+        )
+        plt.fill_between(
+            test_n_range,
+            np.min(rank_corr, axis=0),
+            np.max(rank_corr, axis=0),
+            alpha=0.3,
+            color=color_dict[model_name],
+        )
+
     plt.xlabel("Test point cloud sizes (N)", fontsize=18)
     plt.ylabel("Rank Correlation", fontsize=18)
     plt.xticks(test_n_range, fontsize=16)
@@ -160,6 +135,7 @@ def plot_size_generalization(results, params):
 def plot_output(results, params):
     data = GWLBDataModule(
         fname=f"{params['data_dir']}/GWLB_points{params['point_cloud_size']}_classes[2, 7].pkl",
+        model_name="SVD-DeepSet",
     )
     data.prepare_data()
 
@@ -167,19 +143,17 @@ def plot_output(results, params):
 
     # First subplot for Training Set
     plt.subplot(1, 3, 1)
-    plt.scatter(
-        data.dist_true_train,
-        results["normalized"]["train_out"],
-        label="Normalized SVD-DeepSet",
-        alpha=0.75,
-    )
-    plt.scatter(
-        data.dist_true_train, results["unnormalized"]["train_out"], label="SVD-DeepSet", alpha=0.75
-    )
+    for model_name in model_params.keys():
+        plt.scatter(
+            data.dist_true_train,
+            results[model_name]["train_out"],
+            label=model_name,
+            alpha=0.75,
+        )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Training Set ($N=20$)", fontsize=18)
+    plt.title("Training Set (Pointcloud size $M=20$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
@@ -187,42 +161,40 @@ def plot_output(results, params):
 
     # Second subplot for Test Set
     plt.subplot(1, 3, 2)
-    plt.scatter(
-        data.dist_true_test,
-        results["normalized"]["test_out"],
-        label="Normalized SVD-DeepSet",
-        alpha=0.75,
-    )
-    plt.scatter(
-        data.dist_true_test, results["unnormalized"]["test_out"], label="SVD-DeepSet", alpha=0.75
-    )
+    for model_name in model_params.keys():
+        plt.scatter(
+            data.dist_true_test,
+            results[model_name]["test_out"],
+            label=model_name,
+            alpha=0.75,
+        )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set ($N=20$)", fontsize=18)
+    plt.title("Test Set (Pointcloud size $M=20$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
     plt.gca().set_aspect("equal")
 
+    data = GWLBDataModule(
+        fname=f"{params['data_dir']}/GWLB_points{params['large_point_cloud_size']}_classes[2, 7].pkl",
+        model_name="SVD-DeepSet",
+    )
+    data.prepare_data()
     # Third subplot for Test Set with large n
     plt.subplot(1, 3, 3)
-    plt.scatter(
-        data.dist_true_test,
-        results["normalized"]["test_out_large_n"],
-        label="Normalized SVD-DeepSet",
-        alpha=0.75,
-    )
-    plt.scatter(
-        data.dist_true_test,
-        results["unnormalized"]["test_out_large_n"],
-        label="SVD-DeepSet",
-        alpha=0.75,
-    )
+    for model_name in model_params.keys():
+        plt.scatter(
+            data.dist_true_test,
+            results[model_name]["test_out_large_n"],
+            label=model_name,
+            alpha=0.75,
+        )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set ($N=500$)", fontsize=18)
+    plt.title("Test Set (Pointcloud size $M=500$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
@@ -239,12 +211,8 @@ if __name__ == "__main__":
     # Experiment set-up
     parser.add_argument("--num_trials", type=int, default=10, help="Number of trials to run")
     # DeepSet model parameters
-    parser.add_argument("--num_layers", type=int, default=3)
-    parser.add_argument("--hidden_channels", type=int, default=10)
-    parser.add_argument("--set_channels", type=int, default=10)
-    parser.add_argument("--out_channels", type=int, default=10)
     parser.add_argument("--lr", type=float, default=1e-2)
-    parser.add_argument("--max_epochs", type=int, default=5000)
+    parser.add_argument("--max_epochs", type=int, default=3000)
 
     args = parser.parse_args()
 
@@ -257,17 +225,9 @@ if __name__ == "__main__":
         "log_model": None,
         "log_dir": os.path.join(CURRENT_DIR, "log/size_generalization"),
         # data parameters
-        "data_dir": "/export/canton/data/yma93/anydim_transferability/OI-DS/",
+        "data_dir": data_dir,
         "point_cloud_size": 20,
-        # model parameters
-        "model": {
-            "hidden_channels": args.hidden_channels,
-            "set_channels": args.set_channels,
-            "out_channels": args.out_channels,
-            "feature_extractor_num_layers": args.num_layers,
-            "regressor_num_layers": args.num_layers,
-            "num_layers": args.num_layers,
-        },
+        "large_point_cloud_size": 500,
         # training parameters
         "lr": args.lr,
         "lr_patience": 50,
@@ -287,33 +247,23 @@ if __name__ == "__main__":
     except:
         results = {}
 
-    results.setdefault("unnormalized", {})
-    results.setdefault("normalized", {})
+    model_params = {
+        "SVD-DeepSet": {
+            "hid_dim": 16,
+            "out_dim": 16,
+        },
+        "SVD-Normalized DeepSet": {
+            "hid_dim": 16,
+            "out_dim": 16,
+        },
+        "DS-CI (Normalized)": {"hid_dim": 10, "out_dim": 10},
+        "OI-DS (Normalized)": {"hid_dim": 16, "out_dim": 16},
+    }
     test_n_range = [20, 100, 200, 300, 500]
-    for seed in range(args.num_trials):  # run multiple trials
-        params["training_seed"] = seed
-        if not (str(seed) in results["normalized"]):
-            params["model"]["normalized"] = True
-            model_normalized, train_out, test_out, test_out_large_n = train(params)
-            mse, rank_corr = eval(model_normalized, params, test_n_range)
-            results["normalized"][str(seed)] = {"mse": mse, "rank_corr": rank_corr}
-            if seed == 0:
-                results["normalized"]["train_out"] = train_out.squeeze().tolist()
-                results["normalized"]["test_out"] = test_out.squeeze().tolist()
-                results["normalized"]["test_out_large_n"] = test_out_large_n.squeeze().tolist()
-            with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
-                json.dump(results, f)
-        if not (str(seed) in results["unnormalized"]):
-            params["model"]["normalized"] = False
-            model_normalized, train_out, test_out, test_out_large_n = train(params)
-            mse, rank_corr = eval(model_normalized, params, test_n_range)
-            results["unnormalized"][str(seed)] = {"mse": mse, "rank_corr": rank_corr}
-            if seed == 0:
-                results["unnormalized"]["train_out"] = train_out.squeeze().tolist()
-                results["unnormalized"]["test_out"] = test_out.squeeze().tolist()
-                results["unnormalized"]["test_out_large_n"] = test_out_large_n.squeeze().tolist()
-            with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
-                json.dump(results, f)
+    for model_name in model_params.keys():
+        params["model"] = model_params[model_name]
+        params["model"]["model_name"] = model_name
+        train_and_eval(params, args, model_name)
 
     plot_size_generalization(results, params)
     plot_output(results, params)

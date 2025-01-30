@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from .train import train
 from .data import PopStatsDataModule, PopStatsDataset
-from . import color_dict
+from . import color_dict, data_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -186,7 +186,7 @@ if __name__ == "__main__":
         "log_model": None,
         "log_dir": os.path.join(CURRENT_DIR, "log/size_generalization"),
         # data parameters
-        "data_dir": "/export/canton/data/yma93/anydim_transferability/deepset/",
+        "data_dir": data_dir,
         "training_size": args.training_size,
         "test_n_range": args.test_n_range,
         "batch_size": 128,
