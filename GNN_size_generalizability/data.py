@@ -155,14 +155,12 @@ class HomDensityDataset(InMemoryDataset):
 
                 # Generate features
                 # x = torch.randn((n, 1)) + mu[z]
-                x = torch.randn((n, 1))
+                x = torch.rand((n, 1))
             elif self.graph_model == "full_SBM_Gaussian":
                 # Randomly generate SBM parameters
                 K = random.randint(2, 10)  # Number of clusters
                 ps = torch.rand((K, K))  # random K x K probability matrix for SBM
                 ps = ps.tril(diagonal=0) + ps.tril(diagonal=-1).transpose(-1, -2)
-                # Randomly generate mean for Gaussian signals
-                mu = torch.randn(K, 1)
 
                 # Generate graph
                 z = torch.randint(0, K, (n,))
@@ -172,10 +170,8 @@ class HomDensityDataset(InMemoryDataset):
                 A = torch.distributions.Bernoulli(prob_matrix).sample()
                 A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
                 edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
-
                 # Generate features
-                x = torch.randn((n, 1)) + mu[z]
-
+                x = torch.rand((n, 1)) * 5
             if self.task == "triangle":
                 y = torch.einsum("ij,jk,ki,id,jd,kd -> id", A, A, A, x, x, x) / (n**2)
                 y = y.squeeze(-1)

@@ -1,8 +1,8 @@
 color_dict = {
-    "SVD-DeepSet": "#FFB000",
-    "SVD-Normalized DeepSet": "#648FFF",
+    "SVD-DeepSet": "#dc267f",
+    "SVD-Normalized DeepSet": "#785ef0",
     "DS-CI (Normalized)": "#FE6100",
-    "OI-DS (Normalized)": "#dc267f",
+    "OI-DS (Normalized)": "#FFB000",
 }
 
 data_dir = "/export/canton/data/yma93/anydim_transferability/OI-DS/"

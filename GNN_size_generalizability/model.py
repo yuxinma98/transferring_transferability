@@ -2,7 +2,12 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from torch import Tensor
-from ign_layers import layer_2_to_2, layer_2_to_1, layer_2_to_1_anydim, layer_2_to_2_anydim
+from Anydim_transferability.GNN_size_generalizability.ign_layers import (
+    layer_2_to_2,
+    layer_2_to_1,
+    layer_2_to_1_anydim,
+    layer_2_to_2_anydim,
+)
 
 class GNN_layer(nn.Module):
 

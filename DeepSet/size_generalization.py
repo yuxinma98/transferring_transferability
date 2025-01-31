@@ -3,12 +3,16 @@ import argparse
 import json
 from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
+
 from Anydim_transferability.DeepSet.train import train
 from Anydim_transferability.DeepSet.data import PopStatsDataModule, PopStatsDataset
 from Anydim_transferability.DeepSet import color_dict, data_dir
+from Anydim_transferability import typesetting
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+typesetting()
 
 def eval(model, params, test_n_range):
     """

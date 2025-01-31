@@ -1,6 +1,6 @@
 color_dict = {
     "DeepSet": "#FFB000",
-    "Normalized DeepSet": "#648FFF",
+    "Normalized DeepSet": "#785ef0",
     "PointNet": "#FE6100",
 }
 

@@ -5,12 +5,14 @@ import torch
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 
 from Anydim_transferability.O_n.train import train, GWLBDataModule
 from Anydim_transferability.O_n import color_dict, data_dir
+from Anydim_transferability import typesetting
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
+typesetting()
 
 def eval(model, params):
     """
@@ -71,10 +73,10 @@ def train_and_eval(params, args, model_name):
 
 
 def plot_size_generalization(results, params):
-    plt.figure(figsize=(14, 5))
+    plt.figure(figsize=(7, 5))
 
     # First subplot for Test MSE
-    plt.subplot(1, 2, 1)
+    plt.subplot(1, 1, 1)
     for model_name in model_params.keys():
         log_mse = [
             np.log(results[model_name][str(trial)]["mse"]) for trial in range(args.num_trials)
@@ -97,34 +99,34 @@ def plot_size_generalization(results, params):
     plt.ylabel("log(Test MSE)", fontsize=18)
     plt.xticks(test_n_range, fontsize=16)
     plt.yticks(fontsize=16)
-    plt.legend(fontsize=16)
+    plt.legend(fontsize=16, loc="upper right")
 
-    # Second subplot for Spearman Correlation
-    plt.subplot(1, 2, 2)
-    for model_name in model_params.keys():
-        rank_corr = [
-            results[model_name][str(trial)]["rank_corr"] for trial in range(args.num_trials)
-        ]
-        plt.plot(
-            test_n_range,
-            np.mean(rank_corr, axis=0),
-            "o-",
-            label=model_name,
-            color=color_dict[model_name],
-        )
-        plt.fill_between(
-            test_n_range,
-            np.min(rank_corr, axis=0),
-            np.max(rank_corr, axis=0),
-            alpha=0.3,
-            color=color_dict[model_name],
-        )
+    # # Second subplot for Spearman Correlation
+    # plt.subplot(1, 2, 2)
+    # for model_name in model_params.keys():
+    #     rank_corr = [
+    #         results[model_name][str(trial)]["rank_corr"] for trial in range(args.num_trials)
+    #     ]
+    #     plt.plot(
+    #         test_n_range,
+    #         np.mean(rank_corr, axis=0),
+    #         "o-",
+    #         label=model_name,
+    #         color=color_dict[model_name],
+    #     )
+    #     plt.fill_between(
+    #         test_n_range,
+    #         np.min(rank_corr, axis=0),
+    #         np.max(rank_corr, axis=0),
+    #         alpha=0.3,
+    #         color=color_dict[model_name],
+    #     )
 
-    plt.xlabel("Test point cloud sizes (N)", fontsize=18)
-    plt.ylabel("Rank Correlation", fontsize=18)
-    plt.xticks(test_n_range, fontsize=16)
-    plt.yticks(fontsize=16)
-    plt.legend(fontsize=16)
+    # plt.xlabel("Test point cloud sizes (N)", fontsize=18)
+    # plt.ylabel("Rank Correlation", fontsize=18)
+    # plt.xticks(test_n_range, fontsize=16)
+    # plt.yticks(fontsize=16)
+    # plt.legend(fontsize=16)
 
     plt.tight_layout()
     plt.savefig(os.path.join(params["log_dir"], "SVD-DS_plot.png"))
@@ -148,12 +150,14 @@ def plot_output(results, params):
             data.dist_true_train,
             results[model_name]["train_out"],
             label=model_name,
-            alpha=0.75,
+            alpha=0.3,
+            s=5,
+            color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Training Set (Pointcloud size $M=20$)", fontsize=18)
+    plt.title("Training Set \n (Pointcloud size $M=20$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
@@ -166,12 +170,14 @@ def plot_output(results, params):
             data.dist_true_test,
             results[model_name]["test_out"],
             label=model_name,
-            alpha=0.75,
+            alpha=0.3,
+            s=5,
+            color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set (Pointcloud size $M=20$)", fontsize=18)
+    plt.title("Test Set \n (Pointcloud size $M=20$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
@@ -189,12 +195,14 @@ def plot_output(results, params):
             data.dist_true_test,
             results[model_name]["test_out_large_n"],
             label=model_name,
-            alpha=0.75,
+            alpha=0.3,
+            s=5,
+            color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set (Pointcloud size $M=500$)", fontsize=18)
+    plt.title("Test Set \n (Pointcloud size $M=500$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)

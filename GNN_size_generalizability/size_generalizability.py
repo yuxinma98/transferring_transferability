@@ -9,9 +9,9 @@ from torch_geometric.loader import DataLoader
 from torchmetrics import MeanSquaredError
 from tqdm import tqdm
 
-from train import train
-from data import HomDensityDataset
-
+from Anydim_transferability.GNN_size_generalizability.train import train
+from Anydim_transferability.GNN_size_generalizability.data import HomDensityDataset
+from Anydim_transferability.GNN_size_generalizability import data_dir, color_dict
 
 def nrange(value: Union[str, list]) -> list:
     if isinstance(value, list):
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         "n_nodes": args.training_graph_size,
         "graph_model": args.graph_model,
         "task": args.task,
-        "data_dir": "/export/canton/data/yma93/anydim_transferability/GNN_size_generalizability/",
+        "data_dir": data_dir,
         "val_fraction": 0.2,
         "test_fraction": 0.2,
         "batch_size": 128,
