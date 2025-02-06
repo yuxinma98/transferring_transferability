@@ -5,7 +5,6 @@ import torch
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
 
 from Anydim_transferability.O_n.train import train, GWLBDataModule
 from Anydim_transferability.O_n import color_dict, data_dir
@@ -78,25 +77,24 @@ def plot_size_generalization(results, params):
     # First subplot for Test MSE
     plt.subplot(1, 1, 1)
     for model_name in model_params.keys():
-        log_mse = [
-            np.log(results[model_name][str(trial)]["mse"]) for trial in range(args.num_trials)
-        ]
+        mse = [results[model_name][str(trial)]["mse"] for trial in range(args.num_trials)]
         plt.plot(
             test_n_range,
-            np.mean(log_mse, axis=0),
+            np.mean(mse, axis=0),
             "o-",
             label=model_name,
             color=color_dict[model_name],
         )
         plt.fill_between(
             test_n_range,
-            np.min(log_mse, axis=0),
-            np.max(log_mse, axis=0),
+            np.min(mse, axis=0),
+            np.max(mse, axis=0),
             alpha=0.3,
             color=color_dict[model_name],
         )
-    plt.xlabel("Test point cloud sizes (N)", fontsize=18)
-    plt.ylabel("log(Test MSE)", fontsize=18)
+    plt.yscale("log")
+    plt.xlabel("Test pointcloud sizes (M)", fontsize=18)
+    plt.ylabel("Test MSE", fontsize=18)
     plt.xticks(test_n_range, fontsize=16)
     plt.yticks(fontsize=16)
     plt.legend(fontsize=16, loc="upper right")
@@ -256,15 +254,16 @@ if __name__ == "__main__":
         results = {}
 
     model_params = {
-        "SVD-DeepSet": {
+        "SVD-DS": {
             "hid_dim": 16,
             "out_dim": 16,
         },
-        "SVD-Normalized DeepSet": {
+        "SVD-DS (Normalized)": {
             "hid_dim": 16,
             "out_dim": 16,
         },
         "DS-CI (Normalized)": {"hid_dim": 10, "out_dim": 10},
+        "DS-CI (Compatible)": {"hid_dim": 10, "out_dim": 10},
         "OI-DS (Normalized)": {"hid_dim": 12, "out_dim": 12},
     }
     test_n_range = [20, 100, 200, 300, 500]

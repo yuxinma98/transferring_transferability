@@ -1,7 +1,8 @@
 color_dict = {
-    "SVD-DeepSet": "#dc267f",
-    "SVD-Normalized DeepSet": "#785ef0",
+    "SVD-DS": "#dc267f",
+    "SVD-DS (Normalized)": "#785ef0",
     "DS-CI (Normalized)": "#FE6100",
+    "DS-CI (Compatible)": "#648fff",
     "OI-DS (Normalized)": "#FFB000",
 }
 

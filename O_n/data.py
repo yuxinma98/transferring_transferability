@@ -31,7 +31,8 @@ class GWLBDataModule(pl.LightningDataModule):
         self.dist_true_train = torch.from_numpy(np.array(kernel_train)).unsqueeze(1)
         self.dist_true_test = torch.from_numpy(np.array(kernel_test)).unsqueeze(1)
 
-        if self.model_name == "SVD-DeepSet" or self.model_name == "SVD-Normalized DeepSet":
+        # preparocessing
+        if self.model_name == "SVD-DS" or self.model_name == "SVD-DS (Normalized)":
             X1_train, X2_train = self._svd(X1_train), self._svd(
                 X2_train
             )  # num_pointclouds x num_points x 3
@@ -75,15 +76,19 @@ class GWLBDataModule(pl.LightningDataModule):
         n = X.shape[1]
         data = Data()
         Gram = torch.FloatTensor(torch.matmul(X, X.transpose(1, 2)))  # num_pointclouds x n x n
-        off_mask = torch.triu(torch.ones(n, n)) == 1
 
         data.f_d = torch.diagonal(Gram, 0, dim1=1, dim2=2).unsqueeze(-1)  # num_pointclouds x n x 1
-        data.f_o = Gram[:, off_mask].unsqueeze(-1)  # num_pointclouds x n(n-1)/2 x 1
-        data.f_star = (
-            (data.f_d * (torch.sum(Gram, dim=2, keepdim=True) - data.f_d)).sum(dim=1)
-        ) / (
-            n * (n - 1)
-        )  # num_pointclouds x 1
+        if self.model_name == "DS-CI (Normalized)":
+            off_mask = torch.triu(torch.ones(n, n), diagonal=1) == 1
+            data.f_o = Gram[:, off_mask].unsqueeze(-1)  # num_pointclouds x n(n-1)/2 x 1
+            data.f_star = ((data.f_d * (Gram.sum(dim=2, keepdim=True) - data.f_d)).sum(dim=1)) / (
+                n * (n - 1)
+            )  # num_pointclouds x 1
+        elif self.model_name == "DS-CI (Compatible)":
+            data.f_o = Gram.reshape(num_pointclouds, -1).unsqueeze(
+                -1
+            )  # num_pointclouds x (n^2) x 1
+            data.f_star = ((data.f_d * (Gram.sum(dim=2, keepdim=True))).sum(dim=1)) / (n * n)
         return data
 
     def _get_Kmeans(self, X: torch.Tensor, k: int = 3) -> Data:
@@ -103,7 +108,7 @@ class GWLBDataModule(pl.LightningDataModule):
         K_all = np.zeros((num_pointclouds, k, 3))
         data = Data()
         for i in range(num_pointclouds):
-            kmeans = KMeans(n_clusters=k, random_state=0, init="k-means++", n_init=1).fit(X[i])
+            kmeans = KMeans(n_clusters=k, random_state=0, init="k-means++", n_init=20).fit(X[i])
             K = kmeans.cluster_centers_  # (num_centroids, 3)
             # sort Kmeans centroid by norm
             indexlist = np.argsort(np.linalg.norm(K, axis=1))
