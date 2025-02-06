@@ -3,7 +3,6 @@ import argparse
 import json
 from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
 
 from Anydim_transferability.DeepSet.train import train
@@ -71,11 +70,11 @@ def plot_results(results):
         # plot MSE
         ax = axes[0, task_id - 1]
         for model_name in normalizations.keys():
-            log_mse_list = [
-                np.log(results[f"task{task_id}"][model_name][str(seed)]["mse"])
+            mse_list = [
+                results[f"task{task_id}"][model_name][str(seed)]["mse"]
                 for seed in range(args.num_trials)
             ]
-            mean_mse = np.mean(log_mse_list, axis=0)
+            mean_mse = np.mean(mse_list, axis=0)
             ax.plot(
                 args.test_n_range,
                 mean_mse,
@@ -85,16 +84,17 @@ def plot_results(results):
             )
             ax.fill_between(
                 args.test_n_range,
-                np.min(log_mse_list, axis=0),
-                np.max(log_mse_list, axis=0),
+                np.min(mse_list, axis=0),
+                np.max(mse_list, axis=0),
                 alpha=0.3,
                 color=color_dict[model_name],
             )
-        ax.set_xlabel("Test set size (M)", fontsize=18)
-        ax.set_ylabel("log(Test MSE)", fontsize=18)
+        ax.set_yscale("log")
+        ax.set_xlabel("Test set size (M)", fontsize=16)
+        ax.set_ylabel("Test MSE", fontsize=16)
         ax.set_xticks(args.test_n_range)
-        ax.tick_params(axis="x", labelsize=10)
-        ax.tick_params(axis="y", labelsize=14)
+        ax.tick_params(axis="x", labelsize=12)
+        ax.tick_params(axis="y", labelsize=12)
         ax.legend(fontsize=12, loc="upper right")
         ax.set_title(f"{titles[task_id]}", fontsize=18)
 
@@ -123,11 +123,11 @@ def plot_results(results):
                 color=color_dict[model_name],
             )
 
-        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=2)
-        ax.set_xlabel(xlabels[task_id], fontsize=18)
-        ax.set_ylabel(ylabels[task_id], fontsize=18)
-        ax.tick_params(axis="x", labelsize=14)
-        ax.tick_params(axis="y", labelsize=14)
+        ax.plot(truth.t, truth.y, label="Truth", color="black", linestyle="--", linewidth=2)
+        ax.set_xlabel(xlabels[task_id], fontsize=16)
+        ax.set_ylabel(ylabels[task_id], fontsize=16)
+        ax.tick_params(axis="x", labelsize=12)
+        ax.tick_params(axis="y", labelsize=12)
         ax.legend(loc="upper right", fontsize=12)
 
         # plot predictions for large n
@@ -148,10 +148,10 @@ def plot_results(results):
             )
 
         ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=2)
-        ax.set_xlabel(xlabels[task_id], fontsize=18)
-        ax.set_ylabel(ylabels[task_id], fontsize=18)
-        ax.tick_params(axis="x", labelsize=14)
-        ax.tick_params(axis="y", labelsize=14)
+        ax.set_xlabel(xlabels[task_id], fontsize=16)
+        ax.set_ylabel(ylabels[task_id], fontsize=16)
+        ax.tick_params(axis="x", labelsize=12)
+        ax.tick_params(axis="y", labelsize=12)
         ax.legend(loc="upper right", fontsize=12)
 
     plt.tight_layout()

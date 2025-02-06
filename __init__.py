@@ -22,9 +22,9 @@ def str2bool(value):
 
 
 def typesetting():
-    matplotlib.rcParams["mathtext.fontset"] = "stix"
-    matplotlib.rcParams["font.family"] = "STIXGeneral"
-    matplotlib.rcParams["mathtext.fontset"] = "custom"
-    matplotlib.rcParams["mathtext.rm"] = "Bitstream Vera Sans"
-    matplotlib.rcParams["mathtext.it"] = "Bitstream Vera Sans:italic"
-    matplotlib.rcParams["mathtext.bf"] = "Bitstream Vera Sans:bold"
+    matplotlib.rcParams["text.usetex"] = True
+    matplotlib.rcParams["font.family"] = "serif"
+    matplotlib.rcParams["font.serif"] = ["Computer Modern Roman"]
+    matplotlib.rcParams["text.latex.preamble"] = (
+        r"\usepackage{amsmath} \usepackage{amssymb} \usepackage{mathptmx}"
+    )
