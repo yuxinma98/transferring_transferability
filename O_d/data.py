@@ -40,7 +40,7 @@ class GWLBDataModule(pl.LightningDataModule):
             self.X_train = torch.stack([X1_train, X2_train], dim=0)
             self.X_test = torch.stack([X1_test, X2_test], dim=0)
 
-        elif self.model_name == "DS-CI (Normalized)":
+        elif self.model_name == "DS-CI (Normalized)" or self.model_name == "DS-CI (Compatible)":
             self.X_train = [self._get_fs(X1_train), self._get_fs(X2_train)]
             self.X_test = [self._get_fs(X1_test), self._get_fs(X2_test)]
 
@@ -121,19 +121,19 @@ class GWLBDataModule(pl.LightningDataModule):
         return data
 
     def train_dataloader(self):
-        if self.model_name == "SVD-DeepSet" or self.model_name == "SVD-Normalized DeepSet":
+        if self.model_name == "SVD-DS" or self.model_name == "SVD-DS (Normalized)":
             return DataLoader(self.X_train, batch_size=len(self.X_train), shuffle=False)
-        elif self.model_name == "DS-CI (Normalized)" or self.model_name == "OI-DS (Normalized)":
+        else:
             return pyg_DataLoader(self.X_train, batch_size=2, shuffle=False)
 
     def val_dataloader(self):
-        if self.model_name == "SVD-DeepSet" or self.model_name == "SVD-Normalized DeepSet":
+        if self.model_name == "SVD-DS" or self.model_name == "SVD-DS":
             return DataLoader(self.X_train, batch_size=len(self.X_train), shuffle=False)
-        elif self.model_name == "DS-CI (Normalized)" or self.model_name == "OI-DS (Normalized)":
+        else:
             return pyg_DataLoader(self.X_train, batch_size=2, shuffle=False)
 
     def test_dataloader(self):
-        if self.model_name == "SVD-DeepSet" or self.model_name == "SVD-Normalized DeepSet":
+        if self.model_name == "SVD-DS" or self.model_name == "SVD-DS":
             return DataLoader(self.X_test, batch_size=len(self.X_test), shuffle=False)
-        elif self.model_name == "DS-CI (Normalized)" or self.model_name == "OI-DS (Normalized)":
+        else:
             return pyg_DataLoader(self.X_test, batch_size=2, shuffle=False)

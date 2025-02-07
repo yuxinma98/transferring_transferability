@@ -10,8 +10,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 from torchmetrics.regression import SpearmanCorrCoef
 
-from Anydim_transferability.O_n.data import GWLBDataModule
-from Anydim_transferability.O_n.model import SiameseRegressor
+from Anydim_transferability.O_d.data import GWLBDataModule
+from Anydim_transferability.O_d.model import SiameseRegressor
 
 
 def train(params, record_output=False):

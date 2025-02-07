@@ -10,7 +10,7 @@ class SiameseRegressor(torch.nn.Module):
     def __init__(self, params):
         super(SiameseRegressor, self).__init__()
         self.params = params
-        if params["model_name"] == "SVD-DeepSet":
+        if params["model_name"] == "SVD-DS":
             self.SM = DeepSet(
                 in_channels=3,
                 out_channels=params["out_dim"],
@@ -20,7 +20,7 @@ class SiameseRegressor(torch.nn.Module):
                 regressor_num_layers=2,
                 normalization="sum",
             )
-        elif params["model_name"] == "SVD-Normalized DeepSet":
+        elif params["model_name"] == "SVD-DS (Normalized)":
             self.SM = DeepSet(
                 in_channels=3,
                 out_channels=params["out_dim"],
@@ -30,7 +30,10 @@ class SiameseRegressor(torch.nn.Module):
                 regressor_num_layers=2,
                 normalization="mean",
             )
-        elif params["model_name"] == "DS-CI (Normalized)":
+        elif (
+            params["model_name"] == "DS-CI (Normalized)"
+            or params["model_name"] == "DS-CI (Compatible)"
+        ):
             self.SM = ScalarModel(**params)
         elif params["model_name"] == "OI-DS (Normalized)":
             self.SM = ScalarModel_KMeans(**params)

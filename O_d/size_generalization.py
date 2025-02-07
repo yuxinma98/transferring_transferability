@@ -6,12 +6,13 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Anydim_transferability.O_n.train import train, GWLBDataModule
-from Anydim_transferability.O_n import color_dict, data_dir
+from Anydim_transferability.O_d.train import train, GWLBDataModule
+from Anydim_transferability.O_d import color_dict, data_dir
 from Anydim_transferability import typesetting
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
+
 
 def eval(model, params):
     """
@@ -135,21 +136,33 @@ def plot_size_generalization(results, params):
 def plot_output(results, params):
     data = GWLBDataModule(
         fname=f"{params['data_dir']}/GWLB_points{params['point_cloud_size']}_classes[2, 7].pkl",
-        model_name="SVD-DeepSet",
+        model_name="SVD-DS",
     )
     data.prepare_data()
 
     plt.figure(figsize=(14, 5))
 
     # First subplot for Training Set
+    # Define the proportion of data to sample
+    sample_proportion = 0.3
+
     plt.subplot(1, 3, 1)
     for model_name in model_params.keys():
+        # Randomly subsample indices
+        num_samples = int(len(data.dist_true_train) * sample_proportion)
+        sampled_indices = np.random.choice(len(data.dist_true_train), num_samples, replace=False)
+
+        # Subsample the data
+        sampled_true_train = data.dist_true_train[sampled_indices]
+        sampled_train_out = np.array(results[model_name]["train_out"])[sampled_indices]
+
         plt.scatter(
-            data.dist_true_train,
-            results[model_name]["train_out"],
+            sampled_true_train,
+            sampled_train_out,
             label=model_name,
-            alpha=0.3,
-            s=5,
+            alpha=0.4,
+            s=20,
+            marker="o",
             color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
@@ -164,12 +177,21 @@ def plot_output(results, params):
     # Second subplot for Test Set
     plt.subplot(1, 3, 2)
     for model_name in model_params.keys():
+        # Randomly subsample indices
+        num_samples = int(len(data.dist_true_test) * sample_proportion)
+        sampled_indices = np.random.choice(len(data.dist_true_test), num_samples, replace=False)
+
+        # Subsample the data
+        sampled_true_test = data.dist_true_test[sampled_indices]
+        sampled_test_out = np.array(results[model_name]["test_out"])[sampled_indices]
+
         plt.scatter(
-            data.dist_true_test,
-            results[model_name]["test_out"],
+            sampled_true_test,
+            sampled_test_out,
             label=model_name,
-            alpha=0.3,
-            s=5,
+            alpha=0.4,
+            s=20,
+            marker="o",
             color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
@@ -183,18 +205,27 @@ def plot_output(results, params):
 
     data = GWLBDataModule(
         fname=f"{params['data_dir']}/GWLB_points{params['large_point_cloud_size']}_classes[2, 7].pkl",
-        model_name="SVD-DeepSet",
+        model_name="SVD-DS",
     )
     data.prepare_data()
     # Third subplot for Test Set with large n
     plt.subplot(1, 3, 3)
     for model_name in model_params.keys():
+        # Randomly subsample indices
+        num_samples = int(len(data.dist_true_test) * sample_proportion)
+        sampled_indices = np.random.choice(len(data.dist_true_test), num_samples, replace=False)
+
+        # Subsample the data
+        sampled_true_test = data.dist_true_test[sampled_indices]
+        sampled_test_out = np.array(results[model_name]["test_out_large_n"])[sampled_indices]
+
         plt.scatter(
-            data.dist_true_test,
-            results[model_name]["test_out_large_n"],
+            sampled_true_test,
+            sampled_test_out,
             label=model_name,
-            alpha=0.3,
-            s=5,
+            alpha=0.4,
+            s=20,
+            marker="o",
             color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
@@ -263,7 +294,7 @@ if __name__ == "__main__":
             "out_dim": 16,
         },
         "DS-CI (Normalized)": {"hid_dim": 10, "out_dim": 10},
-        "DS-CI (Compatible)": {"hid_dim": 10, "out_dim": 10},
+        # "DS-CI (Compatible)": {"hid_dim": 10, "out_dim": 10},
         "OI-DS (Normalized)": {"hid_dim": 12, "out_dim": 12},
     }
     test_n_range = [20, 100, 200, 300, 500]
