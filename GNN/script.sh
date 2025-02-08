@@ -1,5 +1,11 @@
-sample_fractions=(0.1 0.2 0.3 0.4 0.5)
-for fraction in "${sample_fractions[@]}"; do
-    echo "Running main.py with sample_fraction=$fraction"
-    CUDA_VISIBLE_DEVICES=1 python main.py --sample_fraction "$fraction" --num_layers 2 --lr 5e-4 --hidden_channels 16 --max_epochs 600
+#!/bin/bash
+
+declare -A model_args
+model_args=( ["reduced"]=4 ["unreduced"]=4) #["simple"]=15 ["ign"]=5 ["ign_anydim"]=9)
+
+for model in "${!model_args[@]}"
+do
+    hidden_channels=${model_args[$model]}
+    echo "Running size_generalizability.py with model argument: $model and hidden channels: $hidden_channels"
+    CUDA_VISIBLE_DEVICES=3 python -m Anydim_transferability.GNN_size_generalizability.size_generalizability --model "$model" --graph_model "SBM_Gaussian" --hidden_channels "$hidden_channels" --task "triangle"
 done

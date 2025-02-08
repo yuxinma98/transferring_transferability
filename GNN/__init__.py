@@ -1,7 +1,7 @@
 color_dict = {
     "GNN": "#dc267f",
-    "Pointwise-incompatible-unreduce": "#fe6100",
-    "Pointwise-compatible-unreduced": "#ffb000",
+    "IGN": "#fe6100",
+    # "Pointwise-compatible-unreduced": "#ffb000",
     "GNN-comptible-reduce": "#785ef0",
     "GNN-compatible-unreduce": "#648FFF",
 }

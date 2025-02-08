@@ -2,15 +2,15 @@ import wandb
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
-import torch_geometric as pyg
-import torchmetrics
-from torch_geometric.datasets import planetoid, SNAPDataset
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
+from torch_geometric.loader import DataLoader
+from torch.utils.data import random_split
+import torch_geometric.utils as pyg_utils
 
-from data import SBM_GaussianDataset
-from model import GNN
+from Anydim_transferability.GNN_size_generalizability.data import HomDensityDataset
+from Anydim_transferability.GNN_size_generalizability.model import GNN
 
 
 def train(params):
@@ -44,120 +44,76 @@ def train(params):
     wandb.finish()
     return model
 
-    # class GNNTrainingModule(pl.LightningModule):
-    def __init__(self, params: dict) -> None:
-        super().__init__()
-        self.save_hyperparameters(params)  # log hyperparameters in wandb
+
+class GNNTrainingModule(pl.LightningModule):
+    def __init__(self, params):
+        super(GNNTrainingModule, self).__init__()
+        self.save_hyperparameters(params)
         self.params = params
+        self.loss = nn.MSELoss()
 
     def prepare_data(self):
-        if self.params["dataset"] == "SBM_Gaussian":
-            dataset = SBM_GaussianDataset(
-                root=self.params["data_dir"],
-                N=self.params["N"],
-                d=self.params["d"],
-                K=self.params["K"],
-            )
-            self.task = "regression"
-        elif self.params["dataset"] == "facebook":
-            dataset = SNAPDataset(root=self.params["data_dir"], name="ego-facebook")
-            self.task = "regression"
-        data = dataset[0]
-        if self.params["dataset"] != "SBM_Gaussian":
-            data.A = pyg.utils.to_dense_adj(data.edge_index)
-        self.params["model"]["in_channels"] = data.x.shape[-1]
-        self.params["model"]["out_channels"] = (
-            dataset.num_classes if self.task == "classification" else 1
+        self.dataset = HomDensityDataset(
+            root=self.params["data_dir"],
+            N=self.params["n_graphs"],
+            n=self.params["n_nodes"],
+            **self.params
         )
-        if (
-            self.params["dataset"] == "facebook"
-        ):  # facebook dataset does not have target y or train/val/test masks
-            A = data.A.squeeze()
-            triangles = (A @ A @ A).diag()
-            data.y = triangles / (A.shape[-1] ** 2)  # 1 x n
-            data.train_mask = torch.zeros_like(data.y, dtype=torch.bool)
-            data.val_mask = torch.zeros_like(data.y, dtype=torch.bool)
-            data.test_mask = torch.zeros_like(data.y, dtype=torch.bool)
-            data.train_mask[: int(0.8 * data.y.shape[0])] = True
-            data.val_mask[int(0.8 * data.y.shape[0]) : int(0.9 * data.y.shape[0])] = True
-            data.test_mask[int(0.9 * data.y.shape[0]) :] = True
-
-        self.data = data
+        # self.params["model"]["in_channels"] = (
+        #     self.params["feature_dim"] + 1
+        #     if self.params["task"] == "conditional_triangle"
+        #     else self.params["feature_dim"]
+        # )
+        self.params["model"]["in_channels"] = 1
+        self.params["model"]["out_channels"] = 1
         self.model = GNN(**self.params["model"])
 
-        if self.task == "classification":
-            self.loss = nn.CrossEntropyLoss()
-            self.metric = torchmetrics.Accuracy(
-                task="multiclass", num_classes=self.params["model"]["out_channels"]
+    def setup(self, stage=None):
+        if stage == "fit" or stage == None:
+            train_fraction = 1 - self.params["val_fraction"] - self.params["test_fraction"]
+
+            self.train_dataset, self.val_dataset, self.test_dataset = random_split(
+                self.dataset,
+                [train_fraction, self.params["val_fraction"], self.params["test_fraction"]],
+                generator=torch.Generator().manual_seed(self.params["data_seed"]),
             )
-            self.metric_name = "acc"
-        elif self.task == "regression":
-            self.loss = nn.MSELoss()
-            self.metric = torchmetrics.MeanSquaredError()
-            self.metric_name = "mse"
-        else:
-            raise "Unknown task"
 
     def train_dataloader(self):
-        return pyg.loader.DataLoader([self.data], batch_size=1)
+        return DataLoader(
+            self.train_dataset, batch_size=self.params["batch_size"], shuffle=True, drop_last=True
+        )
 
     def val_dataloader(self):
-        return pyg.loader.DataLoader([self.data], batch_size=1)
+        return DataLoader(self.val_dataset, batch_size=self.params["batch_size"])
 
     def test_dataloader(self):
-        return pyg.loader.DataLoader([self.data], batch_size=1)
+        return DataLoader(self.test_dataset, batch_size=self.params["batch_size"])
 
-    def forward(self, data: pyg.data.Data) -> torch.Tensor:
-        return self.model(data.A, data.x).squeeze(0)
+    def forward(self, data):
+        A = pyg_utils.to_dense_adj(data.edge_index, batch=data.batch)
+        x, mask = pyg_utils.to_dense_batch(data.x, batch=data.batch)
+        return self.model(A, x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
-            self.parameters(),
-            lr=self.params["lr"],
-            betas=(0.9, 0.999),
-            weight_decay=self.params["weight_decay"],
+            self.parameters(), lr=self.params["lr"], weight_decay=self.params["weight_decay"]
         )
-        sch = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.5, patience=self.params["lr_patience"]
-        )
-        scheduler = {
-            "scheduler": sch,
-            "monitor": "val_loss",
-            "frequency": 1,
-            "interval": "epoch",
-        }
-        return [optimizer], [scheduler]
+        return optimizer
 
-    def training_step(self, batch: pyg.data.Data, batch_idx) -> torch.Tensor:
-        loss, metric = self._compute_loss_and_metrics(batch, mode="train")
-        self.log_dict(
-            {"train_loss": loss, f"train_{self.metric_name}": metric}, batch_size=len(batch)
-        )
+    def training_step(self, batch, batch_idx):
+        out = self.forward(batch)
+        loss = self.loss(out.reshape(-1), batch.y)
+        self.log("train_loss", loss, batch_size=self.params["batch_size"])
         return loss
 
-    def validation_step(self, batch: pyg.data.Data, batch_idx) -> None:
-        loss, metric = self._compute_loss_and_metrics(batch, mode="val")
-        self.log_dict({"val_loss": loss, f"val_{self.metric_name}": metric}, batch_size=len(batch))
+    def validation_step(self, batch, batch_idx):
+        out = self.forward(batch)
+        loss = self.loss(out.reshape(-1), batch.y)
+        self.log("val_loss", loss, batch_size=self.params["batch_size"])
+        return loss
 
-    def test_step(self, batch: pyg.data.Data, batch_idx) -> None:
-        loss, metric = self._compute_loss_and_metrics(batch, mode="test")
-        self.test_metric = metric
-        self.log_dict(
-            {f"test_loss": loss, f"test_{self.metric_name}": metric}, batch_size=len(batch)
-        )
-
-    def _compute_loss_and_metrics(self, data: pyg.data.Data, mode: str="train"):
-        try:
-            mask = getattr(data, f"{mode}_mask")
-        except AttributeError:
-            raise f"Unknown forward mode: {mode}"
-
-        out = self.forward(data)
-        if self.task == "classification":
-            pred = torch.argmax(out, dim=-1)
-        elif self.task == "regression":
-            out = out.squeeze(-1)
-            pred = out
-        loss = self.loss(out[mask], data.y[mask])
-        metric = self.metric(pred[mask], data.y[mask])
-        return loss, metric
+    def test_step(self, batch, batch_idx):
+        out = self.forward(batch)
+        loss = self.loss(out.reshape(-1), batch.y)
+        self.log("test_loss", loss, batch_size=self.params["batch_size"])
+        return loss

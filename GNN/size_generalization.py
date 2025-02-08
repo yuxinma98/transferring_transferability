@@ -12,7 +12,10 @@ from tqdm import tqdm
 from Anydim_transferability.GNN_size_generalizability.train import train
 from Anydim_transferability.GNN_size_generalizability.data import HomDensityDataset
 from Anydim_transferability.GNN_size_generalizability import data_dir, color_dict
+from Anydim_transferability import typesetting
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+typesetting()
 def nrange(value: Union[str, list]) -> list:
     if isinstance(value, list):
         return value
@@ -93,7 +96,7 @@ if __name__ == "__main__":
         "logger": True,  # whether to use wandb to log
         "log_checkpoint": True,  # whether to log model checkpoint in wandb
         "log_model": None,  # whether to log gradient/parameters in wandb
-        "log_dir": "log/size_generalizability",  # directory to save logs
+        "log_dir": os.path.join(CURRENT_DIR, "log/size_generalization"),  # directory to save logs
         # data parameters
         "n_graphs": 5000,  # size of training dataset
         "n_nodes": args.training_graph_size,
@@ -109,7 +112,7 @@ if __name__ == "__main__":
             "hidden_channels": args.hidden_channels,
             "num_layers": args.num_layers,
             "model": args.model,
-            "bias": False,
+            "bias": True,
         },
         # training parameters
         "lr": args.lr,
