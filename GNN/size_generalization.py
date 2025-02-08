@@ -9,9 +9,9 @@ from torch_geometric.loader import DataLoader
 from torchmetrics import MeanSquaredError
 from tqdm import tqdm
 
-from Anydim_transferability.GNN_size_generalizability.train import train
-from Anydim_transferability.GNN_size_generalizability.data import HomDensityDataset
-from Anydim_transferability.GNN_size_generalizability import data_dir, color_dict
+from Anydim_transferability.GNN.train import train
+from Anydim_transferability.GNN.data import HomDensityDataset
+from Anydim_transferability.GNN import data_dir, color_dict
 from Anydim_transferability import typesetting
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))

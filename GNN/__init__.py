@@ -6,4 +6,4 @@ color_dict = {
     "GNN-compatible-unreduce": "#648FFF",
 }
 
-data_dir = "/export/canton/data/yma93/anydim_transferability/GNN_size_generalizability/"
+data_dir = "/export/canton/data/yma93/anydim_transferability/GNN/"
