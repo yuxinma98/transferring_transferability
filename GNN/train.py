@@ -41,8 +41,9 @@ def train(params):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, verbose=True, ckpt_path="best")
+    best_val_loss = model_checkpoint.best_model_score.item()
     wandb.finish()
-    return model
+    return model, best_val_loss
 
 
 class GNNTrainingModule(pl.LightningModule):
@@ -64,8 +65,6 @@ class GNNTrainingModule(pl.LightningModule):
         #     if self.params["task"] == "conditional_triangle"
         #     else self.params["feature_dim"]
         # )
-        self.params["model"]["in_channels"] = 1
-        self.params["model"]["out_channels"] = 1
         self.model = GNN(**self.params["model"])
 
     def setup(self, stage=None):

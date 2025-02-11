@@ -8,37 +8,36 @@ import torch
 from torch_geometric.loader import DataLoader
 from torchmetrics import MeanSquaredError
 from tqdm import tqdm
+import pickle, os
 
 from Anydim_transferability.GNN.train import train
 from Anydim_transferability.GNN.data import HomDensityDataset
 from Anydim_transferability.GNN import data_dir, color_dict
-from Anydim_transferability import typesetting
+from Anydim_transferability import typesetting, nrange, str2list
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
-def nrange(value: Union[str, list]) -> list:
-    if isinstance(value, list):
-        return value
-    if isinstance(value, str):
-        return list(np.arange(*map(float, value.split(":"))))
 
 
-def eval(model, params, test_n_range):
+def eval(model, params, test_n_range, record_out=False):
     model.eval()
     test_params = params.copy()
     test_params["batch_size"] = 5
     test_loss = np.zeros(len(test_n_range))
     mean_squared_error = MeanSquaredError()
+    outputs = []
+    truths = []
     for i, n in tqdm(enumerate(test_n_range)):
         test_params["n_nodes"] = int(n)
         test_dataset = HomDensityDataset(
             root=params["data_dir"],
-            N=1000,
+            N=100,
             n=test_params["n_nodes"],
             graph_model=params["graph_model"],
             task=params["task"],
         )
         test_loader = DataLoader(test_dataset, batch_size=test_params["batch_size"])
+
         with torch.no_grad():
             for batch in test_loader:
                 out = model(batch)
@@ -48,29 +47,87 @@ def eval(model, params, test_n_range):
                 # )  # dim: (batch_size * n)
                 # test_loss[i] += relative_error.sum().item()
                 test_loss[i] += mean_squared_error(out.reshape(-1), batch.y).item() * len(batch.y)
+                if record_out and n == test_n_range[-1]:
+                    outputs.extend(out.reshape(-1).tolist())
+                    truths.extend(batch.y.tolist())
         test_loss[i] /= len(test_dataset) * n
+    if record_out:
+        with open(
+            os.path.join(
+                params["log_dir"],
+                f"outputs_{params['graph_model']}_{params['task']}_{params['model']['model']}_largetest.pkl",
+            ),
+            "wb",
+        ) as f:
+            pickle.dump({"outputs": outputs, "truths": truths}, f)
     return test_loss.tolist()
+
+
+def train_and_eval(params, args):
+    results.setdefault(params["model"]["model"], {})
+    seed = 0
+    for trial in range(args.num_trials):  # run multiple trials
+        if str(trial) in results[params["model"]["model"]]:
+            continue
+        best_model = None
+        for i in range(5):  # for each trial, take the best out of 5 random runs
+            seed = trial * 5 + i
+            params["training_seed"] = seed
+            model, val_loss = train(params)
+            if best_model is None or val_loss < best_loss:
+                best_model, best_loss = (model, val_loss)
+                if trial == 0:  # only record outputs for the first trial
+                    # generate output of train dataset and test dataset
+                    model.eval()
+                    with torch.no_grad():
+                        train_outputs, train_truth = [], []
+                        test_outputs, test_truth = [], []
+                        for data in model.train_dataloader():
+                            out = model(data)
+                            train_outputs.extend(out.reshape(-1).tolist())
+                            train_truth.extend(data.y.tolist())
+                        for data in model.test_dataloader():
+                            out = model(data)
+                            test_outputs.extend(out.reshape(-1).tolist())
+                            test_truth.extend(data.y.tolist())
+                    # save outputs and truth to file
+                    with open(
+                        os.path.join(
+                            params["log_dir"],
+                            f"outputs_{params['graph_model']}_{params['task']}_{params['model']['model']}.pkl",
+                        ),
+                        "wb",
+                    ) as f:
+                        pickle.dump(
+                            {
+                                "train_outputs": train_outputs,
+                                "train_truths": train_truth,
+                                "test_outputs": test_outputs,
+                                "test_truths": test_truth,
+                            },
+                            f,
+                        )
+        mse = eval(
+            best_model, params, test_n_range, record_out=(trial == 0)
+        )  # evaluate the best model on a range of test sizes
+        results[params["model"]["model"]][str(trial)] = mse
+        with open(os.path.join(params["log_dir"], fname), "w") as f:
+            json.dump(results, f)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment set-ups
     parser.add_argument(
-        "--model",
-        type=str,
-        default="reduced",
-        choices=["simple", "reduced", "unreduced", "ign", "ign_anydim"],
-    )
-    parser.add_argument(
         "--graph_model",
         type=str,
-        default="SBM_Gaussian",
+        default="full_SBM_Gaussian",
         choices=["SBM_Gaussian", "full_SBM_Gaussian"],
     )
     parser.add_argument(
         "--task",
         type=str,
-        default="degree",
+        default="triangle",
         choices=["degree", "triangle"],
     )
     parser.add_argument("--training_graph_size", type=int, default=50)
@@ -83,8 +140,6 @@ if __name__ == "__main__":
     parser.add_argument("--num_trials", type=int, default=10, help="Number of trials to run")
 
     # GNN parameters
-    parser.add_argument("--num_layers", type=int, default=5, help="Number of GNN layers")
-    parser.add_argument("--hidden_channels", type=int, default=5, help="Number of hidden channels")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--max_epochs", type=int, default=500, help="Maximum number of epochs")
 
@@ -107,57 +162,38 @@ if __name__ == "__main__":
         "test_fraction": 0.2,
         "batch_size": 128,
         "data_seed": 1,
-        # model parameters
-        "model": {
-            "hidden_channels": args.hidden_channels,
-            "num_layers": args.num_layers,
-            "model": args.model,
-            "bias": True,
-        },
         # training parameters
         "lr": args.lr,
         "lr_patience": 10,
         "weight_decay": 0.1,
         "max_epochs": args.max_epochs,
-        "training_seed": 42,
     }
     if not os.path.exists(params["log_dir"]):
         os.makedirs(params["log_dir"])
     test_n_range = np.power(10, args.log_test_n_range).astype(int)
 
     # load results
-    fname = f"results_{args.graph_model}_{args.task}_{args.model}.json"
+    fname = f"results_{args.graph_model}_{args.task}.json"
     try:
         with open(os.path.join(params["log_dir"], fname), "r") as f:
             results = json.load(f)
     except FileNotFoundError:
         results = {}
 
-    results.setdefault(args.model, {})
-    for seed in tqdm(range(args.num_trials)):
-        if str(seed) not in results[args.model]:  # skip if already done
-            params["training_seed"] = seed
-            model = train(params)
-            mse = eval(model, params, test_n_range)
-            results[args.model][str(seed)] = mse
-        with open(os.path.join(params["log_dir"], fname), "w") as f:
-            json.dump(results, f)
-    # plot results
-    log_mse_list = [np.log(results[args.model][str(seed)]) for seed in range(args.num_trials)]
-    mean_mse = np.mean(log_mse_list, axis=0)
-    std_mse = np.std(log_mse_list, axis=0)
-
-    plt.figure()
-    x = np.array(test_n_range)
-    plt.plot(x, mean_mse)
-    plt.fill_between(
-        x,
-        mean_mse - std_mse,
-        mean_mse + std_mse,
-        alpha=0.3,
-    )
-    plt.xscale("log")
-    plt.xlabel("Test set size (N)")
-    plt.ylabel("log(Test MSE)")
-    plt.savefig(os.path.join(params["log_dir"], f"{args.model}.png"))
-    plt.close()
+    model_params = {
+        "IGN": {"model": "ign", "channel_list": [2, 6, 7, 6, 6, 1], "bias": True},
+        "GNN": {"model": "simple", "channel_list": [1, 18, 18, 18, 18, 1], "bias": True},
+        "GNN-compatible-unreduced": {
+            "model": "unreduced",
+            "channel_list": [1, 5, 5, 5, 4, 1],
+            "bias": True,
+        },
+        "GNN-compatible-reduced": {
+            "model": "reduced",
+            "channel_list": [1, 5, 6, 6, 4, 1],
+            "bias": True,
+        },
+    }
+    for model_name in model_params.keys():
+        params["model"] = model_params[model_name]
+        train_and_eval(params, args)

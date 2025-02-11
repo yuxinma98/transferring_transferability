@@ -1,7 +1,7 @@
 #!/bin/bash
 
 declare -A model_args
-model_args=( ["reduced"]=4 ["simple"]=15) # ["unreduced"]=4 ["ign"]=5 ["ign_anydim"]=9)
+model_args=( ["reduced"]="5,6,6,4" ["simple"]="18,18,18,18" ["unreduced"]="5,5,5,4" ["ign"]="6,7,6,6") # ["unreduced"]=4 ["ign"]=5 ["ign_anydim"]=9)
 
 for model in "${!model_args[@]}"
 do

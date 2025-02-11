@@ -149,10 +149,12 @@ class HomDensityDataset(InMemoryDataset):
                 edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
 
                 # Generate features
-                x = torch.rand((n, 1)) * 5
+                mu = torch.rand((K, 1)) * 3
+                x = mu[z]
+
             elif self.graph_model == "full_SBM_Gaussian":
                 # Randomly generate SBM parameters
-                K = 3
+                K = random.randint(2, 10)
                 ps = torch.rand((K, K))  # random K x K probability matrix for SBM
                 ps = ps.tril(diagonal=0) + ps.tril(diagonal=-1).transpose(-1, -2)
 
@@ -165,11 +167,13 @@ class HomDensityDataset(InMemoryDataset):
                 A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
                 edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
                 # Generate features
-                x = torch.rand((n, 1)) * 5
+                mu = torch.rand((K, 1)) * 3
+                x = mu[z]
 
             if self.task == "triangle":
                 y = torch.einsum("ij,jk,ki,id,jd,kd -> id", A, A, A, x, x, x) / (n**2)
                 y = y.squeeze(-1)
+
             elif self.task == "degree":
                 y = torch.einsum("ij,ji,id,jd -> id", A, A, x, x) / n
                 y = y.squeeze(-1)

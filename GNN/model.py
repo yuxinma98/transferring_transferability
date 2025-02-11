@@ -156,20 +156,15 @@ class GNN(nn.Module):
 
     def __init__(
         self,
-        in_channels: int,
-        hidden_channels: int,
-        num_layers: int,
-        out_channels: int,
+        channel_list: list,
         act: Callable = nn.ReLU(),
         model: str = "simple",  # choices in ["simple", "reduced", "unreduced", "ign"]
         bias: bool = True,
         **kwargs
     ) -> None:
         super(GNN, self).__init__()
-        self.in_channels = in_channels
-        self.hidden_channels = hidden_channels
-        self.num_layers = num_layers
-        self.out_channels = out_channels
+        self.channel_list = channel_list
+        self.num_layers = len(channel_list) - 1
         self.act = act
         self.model = model
         self.bias = bias
@@ -181,92 +176,40 @@ class GNN(nn.Module):
     def build_model(self):
         self.layers = nn.ModuleList()
         if self.model == "simple":
-            if self.num_layers == 1:
-                self.layers.append(GNNSimple_layer(self.in_channels, self.out_channels))
-            else:
-                self.layers.append(GNNSimple_layer(self.in_channels, self.hidden_channels))
-                for _ in range(self.num_layers - 2):
-                    self.layers.append(self.act)
-                    self.layers.append(GNNSimple_layer(self.hidden_channels, self.hidden_channels))
+            for i in range(self.num_layers - 1):
+                self.layers.append(GNNSimple_layer(self.channel_list[i], self.channel_list[i + 1]))
                 self.layers.append(self.act)
-                self.layers.append(GNNSimple_layer(self.hidden_channels, self.out_channels))
+            self.layers.append(GNNSimple_layer(self.channel_list[-2], self.channel_list[-1]))
         if self.model == "reduced" or self.model == "unreduced":
             reduced = True if self.model == "reduced" else False
-            if self.num_layers == 1:
+            for i in range(self.num_layers - 1):
                 self.layers.append(
                     GNN_layer(
-                        A_in_channels=1,
-                        A_out_channels=self.hidden_channels,
-                        x_in_channels=self.in_channels,
-                        x_out_channels=self.out_channels,
+                        A_in_channels=1 if i == 0 else self.channel_list[i],
+                        A_out_channels=self.channel_list[i + 1],
+                        x_in_channels=self.channel_list[i],
+                        x_out_channels=self.channel_list[i + 1],
                         reduced=reduced,
                         bias=self.bias,
                     )
                 )
-            else:
-                self.layers.append(
-                    GNN_layer(
-                        1,
-                        self.hidden_channels,
-                        self.in_channels,
-                        self.hidden_channels,
-                        reduced,
-                        self.bias,
-                    )
-                )
-                for _ in range(self.num_layers - 2):
-                    self.layers.append(self.act)
-                    self.layers.append(
-                        GNN_layer(
-                            self.hidden_channels,
-                            self.hidden_channels,
-                            self.hidden_channels,
-                            self.hidden_channels,
-                            reduced,
-                            self.bias,
-                        )
-                    )
                 self.layers.append(self.act)
-                self.layers.append(
-                    GNN_layer(
-                        self.hidden_channels,
-                        self.hidden_channels,
-                        self.hidden_channels,
-                        self.out_channels,
-                        reduced,
-                        self.bias,
-                    )
+            self.layers.append(
+                GNN_layer(
+                    A_in_channels=1 if self.num_layers == 1 else self.channel_list[-2],
+                    A_out_channels=self.channel_list[-1],
+                    x_in_channels=self.channel_list[-2],
+                    x_out_channels=self.channel_list[-1],
+                    reduced=reduced,
+                    bias=self.bias,
                 )
+            )
 
         if self.model == "ign":
-            if self.num_layers == 1:
-                self.layers.append(layer_2_to_1(self.in_channels + 1, self.out_channels))
-            else:
-                self.layers.append(layer_2_to_2(self.in_channels + 1, self.hidden_channels))
-                for _ in range(self.num_layers - 2):
-                    self.layers.append(self.act)
-                    self.layers.append(layer_2_to_2(self.hidden_channels, self.hidden_channels))
+            for i in range(self.num_layers - 1):
+                self.layers.append(layer_2_to_2(self.channel_list[i], self.channel_list[i + 1]))
                 self.layers.append(self.act)
-                self.layers.append(layer_2_to_1(self.hidden_channels, self.out_channels))
-
-        if self.model == "ign_anydim":
-            if self.num_layers == 1:
-                self.layers.append(
-                    layer_2_to_1_anydim(self.in_channels + 1, self.out_channels, self.bias)
-                )
-            else:
-                self.layers.append(
-                    layer_2_to_2_anydim(self.in_channels + 1, self.hidden_channels, self.bias)
-                )
-                for _ in range(self.num_layers - 2):
-                    self.layers.append(self.act)
-                    self.layers.append(
-                        layer_2_to_2_anydim(self.hidden_channels, self.hidden_channels, self.bias)
-                    )
-                self.layers.append(self.act)
-                self.layers.append(
-                    layer_2_to_1_anydim(self.hidden_channels, self.out_channels, self.bias)
-                )
+            self.layers.append(layer_2_to_1(self.channel_list[-2], self.channel_list[-1]))
 
     def forward(self, adj: Tensor, feature: Tensor) -> Tensor:
         """
