@@ -10,6 +10,13 @@ def nrange(value: Union[str, list]) -> list:
         return list(np.arange(*map(float, value.split(":"))))
 
 
+def str2list(value: Union[str, list]) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        return [int(v) for v in value.split(",")]
+
+
 def str2bool(value):
     if isinstance(value, bool):
         return value
