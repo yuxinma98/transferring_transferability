@@ -60,11 +60,6 @@ class GNNTrainingModule(pl.LightningModule):
             n=self.params["n_nodes"],
             **self.params
         )
-        # self.params["model"]["in_channels"] = (
-        #     self.params["feature_dim"] + 1
-        #     if self.params["task"] == "conditional_triangle"
-        #     else self.params["feature_dim"]
-        # )
         self.model = GNN(**self.params["model"])
 
     def setup(self, stage=None):
@@ -89,9 +84,7 @@ class GNNTrainingModule(pl.LightningModule):
         return DataLoader(self.test_dataset, batch_size=self.params["batch_size"])
 
     def forward(self, data):
-        A = pyg_utils.to_dense_adj(data.edge_index, batch=data.batch)
-        x, mask = pyg_utils.to_dense_batch(data.x, batch=data.batch)
-        return self.model(A, x)
+        return self.model(data.A, data.x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(

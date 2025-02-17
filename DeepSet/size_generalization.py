@@ -8,7 +8,7 @@ import numpy as np
 from Anydim_transferability.DeepSet.train import train
 from Anydim_transferability.DeepSet.data import PopStatsDataModule, PopStatsDataset
 from Anydim_transferability.DeepSet import color_dict, data_dir, plot_model_names
-from Anydim_transferability import typesetting, plot_dir
+from Anydim_transferability import typesetting, plot_dir, str2list
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     # Experiment set-up
     parser.add_argument(
         "--test_n_range",
-        type=list,
+        type=str2list,
         default=list(np.arange(500, 5000, 500)),
         help="List of test set sizes",
     )

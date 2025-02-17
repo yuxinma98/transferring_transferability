@@ -13,7 +13,7 @@ import pickle, os
 from Anydim_transferability.GNN.train import train
 from Anydim_transferability.GNN.data import HomDensityDataset
 from Anydim_transferability.GNN import data_dir, color_dict, plot_model_names
-from Anydim_transferability import typesetting, nrange, plot_dir
+from Anydim_transferability import typesetting, nrange, plot_dir, str2list
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
@@ -240,8 +240,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--graph_model",
         type=str,
-        default="full_SBM_Gaussian",
-        choices=["SBM_Gaussian", "full_SBM_Gaussian"],
+        default="full_random",
+        choices=["SBM", "full_random"],
     )
     parser.add_argument(
         "--task",
@@ -251,10 +251,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--training_graph_size", type=int, default=50)
     parser.add_argument(
-        "--log_test_n_range",
-        type=nrange,
-        default="1.7:3.4:0.4",
-        help="Range of test graph sizes",
+        "--test_n_range",
+        type=str2list,
+        default=[50, 200, 500, 1000, 2000],
+        help="List of test set sizes",
     )
     parser.add_argument("--num_trials", type=int, default=10, help="Number of trials to run")
 
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     }
     if not os.path.exists(params["log_dir"]):
         os.makedirs(params["log_dir"])
-    test_n_range = np.power(10, args.log_test_n_range).astype(int)
+    test_n_range = np.array(args.test_n_range, dtype=int)
 
     # load results
     fname = f"results_{args.graph_model}_{args.task}.json"

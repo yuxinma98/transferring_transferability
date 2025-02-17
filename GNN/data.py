@@ -14,7 +14,7 @@ class HomDensityDataset(InMemoryDataset):
         self,
         root: Union[str, os.PathLike],
         N: int,
-        n: Union[int, tuple],
+        n: int,
         graph_model: str,
         task: str,
         **kwargs,
@@ -23,7 +23,7 @@ class HomDensityDataset(InMemoryDataset):
         Args:
             root (Union[str, os.PathLike]): directory to save the dataset
             N (int): Number of graphs
-            n (Union[int, tuple]): Number of nodes
+            n (int): Number of nodes
             graph_model (str): choice of graph generative model for the generation of data
             task (str): choice of task for learning
         """
@@ -39,64 +39,58 @@ class HomDensityDataset(InMemoryDataset):
         return [f"{self.graph_model}_{self.task}_{self.N}_{self.n}.pt"]
 
     def process(self):
+        if self.graph_model == "SBM":
+            return self.process_SBM()
+        elif self.graph_model == "full_random":
+            return self.process_full_random()
+        else:
+            raise ValueError("Invalid graph model")
+
+    def process_full_random(self):
+        A = torch.rand((self.N, self.n, self.n))
+        A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
+        x = torch.rand((self.N, self.n, 1))
         data_list = []
-
-        for i in range(self.N):
-            if isinstance(self.n, int):
-                n = self.n
-            else:
-                n = random.randint(self.n[0], self.n[1])
-
-            if self.graph_model == "SBM_Gaussian":
-                # Randomly generate SBM parameters
-                # K = random.randint(2, 10)  # Number of clusters
-                K = 3
-                p0 = random.random()
-                p1 = random.random()
-                ps = torch.tensor(
-                    [[p0, p1, p1], [p1, p0, p1], [p1, p1, p0]]
-                )  # 3 x 3 probability matrix for SBM
-
-                # Generate graph
-                z = torch.randint(0, K, (n,))
-                z_one_hot = torch.nn.functional.one_hot(z, num_classes=K).float()
-                prob_matrix = z_one_hot @ ps
-                prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)
-                A = torch.distributions.Bernoulli(prob_matrix).sample()
-                A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
-                edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
-
-                # Generate features
-                mu = torch.rand((K, 1)) * 3
-                x = mu[z]
-
-            elif self.graph_model == "full_SBM_Gaussian":
-                # Randomly generate SBM parameters
-                K = random.randint(10, 20)
-                ps = torch.rand((K, K))  # random K x K probability matrix for SBM
-                ps = ps.tril(diagonal=0) + ps.tril(diagonal=-1).transpose(-1, -2)
-
-                # Generate graph
-                z = torch.randint(0, K, (n,))
-                z_one_hot = torch.nn.functional.one_hot(z, num_classes=K).float()
-                prob_matrix = z_one_hot @ ps
-                prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)
-                A = torch.distributions.Bernoulli(prob_matrix).sample()
-                A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
-                edge_index = pyg_utils.dense_to_sparse(A.unsqueeze(0))[0]
-                # Generate features
-                mu = torch.rand((K, 1)) * 3
-                x = mu[z]
-
+        for i in range(self.N):  # process one-by-one to avoid memory issues
+            Ai, xi = A[i], x[i]
             if self.task == "triangle":
-                y = torch.einsum("ij,jk,ki,id,jd,kd -> id", A, A, A, x, x, x) / (n**2)
-                y = y.squeeze(-1)
-
+                y = torch.einsum("ij,jk,ki,id,jd,kd -> id", Ai, Ai, Ai, xi, xi, xi) / (self.n**2)
             elif self.task == "degree":
-                y = torch.einsum("ij,ji,id,jd -> id", A, A, x, x) / n
-                y = y.squeeze(-1)
+                y = torch.einsum("ij,ji,id,jd -> id", Ai, Ai, xi, xi) / self.n
+            data_list.append(Data(x=xi.unsqueeze(0), A=Ai.unsqueeze(0), y=y.squeeze(-1)))
+        data, slices = self.collate(data_list)
+        torch.save((data, slices), self.processed_paths[0])
+        return data, slices
 
-            data = Data(x=x, edge_index=edge_index, y=y)
+    def process_SBM(self):
+        data_list = []
+        for i in range(self.N):
+            # Randomly generate SBM parameters
+            K = random.randint(10, 20)
+            ps = torch.rand((K, K))  # random K x K probability matrix for SBM
+            ps = ps.tril(diagonal=0) + ps.tril(diagonal=-1).transpose(-1, -2)
+
+            # Generate graph
+            z = torch.randint(0, K, (self.n,))
+            z_one_hot = torch.nn.functional.one_hot(z, num_classes=K).float()
+            prob_matrix = z_one_hot @ ps
+            prob_matrix = prob_matrix @ z_one_hot.transpose(-1, -2)
+            A = torch.distributions.Bernoulli(prob_matrix).sample()
+            A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
+            # Generate features
+            mu = torch.rand((K, 1)) * 3
+            x = mu[z]
+            if self.task == "triangle":
+                y = torch.einsum("ij,jk,ki,id,jd,kd -> id", A, A, A, x, x, x) / (self.n**2)
+            elif self.task == "degree":
+                y = torch.einsum("ij,ji,id,jd -> id", A, A, x, x) / self.n
+
+            data = Data(
+                x=x.unsqueeze(0),
+                edge_index=pyg_utils.dense_to_sparse(A)[0],
+                A=A.unsqueeze(0),
+                y=y.squeeze(-1),
+            )
             data_list.append(data)
 
         data, slices = self.collate(data_list)
