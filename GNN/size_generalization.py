@@ -12,8 +12,8 @@ import pickle, os
 
 from Anydim_transferability.GNN.train import train
 from Anydim_transferability.GNN.data import HomDensityDataset
-from Anydim_transferability.GNN import data_dir, color_dict
-from Anydim_transferability import typesetting, nrange, str2list
+from Anydim_transferability.GNN import data_dir, color_dict, plot_model_names
+from Anydim_transferability import typesetting, nrange, plot_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
@@ -124,7 +124,7 @@ def plot_size_generalization():
         ax.plot(
             np.array(test_n_range),
             np.median(mse_list, axis=0),
-            label=model_name,
+            label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
         ax.fill_between(
@@ -136,22 +136,22 @@ def plot_size_generalization():
         )
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("Test graph size (M)", fontsize=18)
-    ax.set_ylabel("Test MSE", fontsize=18)
-    ax.legend(loc="upper right", fontsize=16)
+    ax.set_xlabel("Test graph size (M)", fontsize=16)
+    ax.set_ylabel("Test MSE", fontsize=16)
+    ax.legend(loc="upper right", fontsize=12)
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
     plt.tight_layout()
     plt.savefig(
         os.path.join(
-            params["log_dir"],
-            f"size_generalization_{params['graph_model']}_{params['task']}.png",
+            plot_dir,
+            f"gnn_{params['graph_model']}_{params['task']}.png",
         )
     )
     plt.savefig(
         os.path.join(
-            params["log_dir"],
-            f"size_generalization_{params['graph_model']}_{params['task']}.pdf",
+            plot_dir,
+            f"gnn_{params['graph_model']}_{params['task']}.pdf",
         )
     )
     plt.close()
@@ -159,7 +159,7 @@ def plot_size_generalization():
 
 def plot_output():
     fig, axs = plt.subplots(1, 3, figsize=(14, 5))
-    for model_name in ["GNN", "GGNN", "Continuous GGNN", "Normalized 2-IGN"]:
+    for model_name in model_params.keys():
         model = model_params[model_name]["model"]
         fname = f"outputs_full_SBM_Gaussian_triangle_{model}.pkl"
         large_fname = f"outputs_full_SBM_Gaussian_triangle_{model}_largetest.pkl"
@@ -174,7 +174,7 @@ def plot_output():
         axs[0].scatter(
             np.array(out["train_truths"])[train_subset],
             np.array(out["train_outputs"])[train_subset],
-            label=model_name,
+            label=plot_model_names[model_name],
             alpha=0.3,
             s=20,
             marker="o",
@@ -188,7 +188,7 @@ def plot_output():
         axs[1].scatter(
             np.array(out["test_truths"])[test_subset],
             np.array(out["test_outputs"])[test_subset],
-            label=model_name,
+            label=plot_model_names[model_name],
             alpha=0.3,
             s=20,
             marker="o",
@@ -202,7 +202,7 @@ def plot_output():
         axs[2].scatter(
             np.array(out_large["truths"])[large_test_subset],
             np.array(out_large["outputs"])[large_test_subset],
-            label=model_name,
+            label=plot_model_names[model_name],
             alpha=0.3,
             s=20,
             marker="o",
@@ -222,14 +222,14 @@ def plot_output():
 
     plt.savefig(
         os.path.join(
-            params["log_dir"],
-            f"outputs_{params['graph_model']}_{params['task']}.png",
+            plot_dir,
+            f"gnn_outputs_{params['graph_model']}_{params['task']}.png",
         )
     )
     plt.savefig(
         os.path.join(
-            params["log_dir"],
-            f"outputs_{params['graph_model']}_{params['task']}.pdf",
+            plot_dir,
+            f"gnn_outputs_{params['graph_model']}_{params['task']}.pdf",
         )
     )
 
@@ -300,7 +300,7 @@ if __name__ == "__main__":
         results = {}
 
     model_params = {
-        "Normalized 2-IGN": {"model": "ign", "channel_list": [2, 6, 7, 6, 6, 1], "bias": True},
+        "IGN": {"model": "ign", "channel_list": [2, 6, 7, 6, 6, 1], "bias": True},
         "GNN": {"model": "simple", "channel_list": [1, 18, 18, 18, 18, 1], "bias": True},
         "GGNN": {
             "model": "unreduced",
