@@ -7,8 +7,8 @@ import numpy as np
 
 from Anydim_transferability.DeepSet.train import train
 from Anydim_transferability.DeepSet.data import PopStatsDataModule, PopStatsDataset
-from Anydim_transferability.DeepSet import color_dict, data_dir
-from Anydim_transferability import typesetting
+from Anydim_transferability.DeepSet import color_dict, data_dir, plot_model_names
+from Anydim_transferability import typesetting, plot_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
@@ -65,7 +65,7 @@ def plot_results(results):
         4: "Mutual information",
     }
     xlabels = {1: "Rotation Angle", 2: "Correlation", 3: "Rank-1 Length", 4: "Sorted Index"}
-    subsample_size = 100
+    subsample_size = 300
     for task_id in [1, 2, 3, 4]:
         # plot MSE
         ax = axes[0, task_id - 1]
@@ -79,7 +79,7 @@ def plot_results(results):
                 args.test_n_range,
                 mean_mse,
                 "o-",
-                label=model_name,
+                label=plot_model_names[model_name],
                 color=color_dict[model_name],
             )
             ax.fill_between(
@@ -115,11 +115,13 @@ def plot_results(results):
             )  # subsample for visualization
             subsampled_x = np.array(test_out[0])[indices]
             subsampled_y = np.array(test_out[1])[indices]
-            ax.plot(
+            ax.scatter(
                 subsampled_x,
                 subsampled_y,
-                "x",
-                label=model_name,
+                marker="o",
+                alpha=0.3,
+                s=20,
+                label=plot_model_names[model_name],
                 color=color_dict[model_name],
             )
 
@@ -139,15 +141,17 @@ def plot_results(results):
             )  # subsample for visualization
             subsampled_x = np.array(test_out[0])[indices]
             subsampled_y = np.array(test_out[1])[indices]
-            ax.plot(
+            ax.scatter(
                 subsampled_x,
                 subsampled_y,
-                "x",
-                label=model_name,
+                marker="o",
+                alpha=0.3,
+                s=20,
+                label=plot_model_names[model_name],
                 color=color_dict[model_name],
             )
 
-        ax.plot(truth.t, truth.y, label="truth", color="black", linestyle="--", linewidth=2)
+        ax.plot(truth.t, truth.y, label="Truth", color="black", linestyle="--", linewidth=2)
         ax.set_xlabel(xlabels[task_id], fontsize=16)
         ax.set_ylabel(ylabels[task_id], fontsize=16)
         ax.tick_params(axis="x", labelsize=12)
@@ -155,8 +159,8 @@ def plot_results(results):
         ax.legend(loc="upper right", fontsize=12)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(params["log_dir"], "deepset_plot.pdf"))
-    plt.savefig(os.path.join(params["log_dir"], "deepset_plot.png"))
+    plt.savefig(os.path.join(plot_dir, "deepset_plot.pdf"))
+    plt.savefig(os.path.join(plot_dir, "deepset_plot.png"))
     plt.close()
 
 

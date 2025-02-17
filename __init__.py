@@ -3,6 +3,9 @@ import argparse
 import numpy as np
 import matplotlib
 
+
+plot_dir = "/cis/home/yma93/projects/Anydim_transferability/plots/"
+
 def nrange(value: Union[str, list]) -> list:
     if isinstance(value, list):
         return value
