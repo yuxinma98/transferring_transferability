@@ -31,7 +31,7 @@ def eval(model, params, test_n_range, record_out=False):
         test_params["n_nodes"] = int(n)
         test_dataset = HomDensityDataset(
             root=params["data_dir"],
-            N=100,
+            N=1000,
             n=test_params["n_nodes"],
             graph_model=params["graph_model"],
             task=params["task"],
@@ -115,6 +115,125 @@ def train_and_eval(params, args):
             json.dump(results, f)
 
 
+def plot_size_generalization():
+    plt.figure(figsize=(8, 5))
+    fig, ax = plt.subplots()
+    for model_name in model_params.keys():
+        model = model_params[model_name]["model"]
+        mse_list = [results[model][str(seed)] for seed in range(args.num_trials)]
+        ax.plot(
+            np.array(test_n_range),
+            np.median(mse_list, axis=0),
+            label=model_name,
+            color=color_dict[model_name],
+        )
+        ax.fill_between(
+            np.array(test_n_range),
+            np.percentile(mse_list, 20, axis=0),
+            np.percentile(mse_list, 80, axis=0),
+            alpha=0.3,
+            color=color_dict[model_name],
+        )
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Test graph size (M)", fontsize=18)
+    ax.set_ylabel("Test MSE", fontsize=18)
+    ax.legend(loc="upper right", fontsize=16)
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(
+            params["log_dir"],
+            f"size_generalization_{params['graph_model']}_{params['task']}.png",
+        )
+    )
+    plt.savefig(
+        os.path.join(
+            params["log_dir"],
+            f"size_generalization_{params['graph_model']}_{params['task']}.pdf",
+        )
+    )
+    plt.close()
+
+
+def plot_output():
+    fig, axs = plt.subplots(1, 3, figsize=(14, 5))
+    for model_name in ["GNN", "GGNN", "Continuous GGNN", "Normalized 2-IGN"]:
+        model = model_params[model_name]["model"]
+        fname = f"outputs_full_SBM_Gaussian_triangle_{model}.pkl"
+        large_fname = f"outputs_full_SBM_Gaussian_triangle_{model}_largetest.pkl"
+        with open(os.path.join(params["log_dir"], fname), "rb") as f:
+            out = pickle.load(f)
+        with open(os.path.join(params["log_dir"], large_fname), "rb") as f:
+            out_large = pickle.load(f)
+
+        # Training data
+        train_subset = np.random.choice(len(out["train_outputs"]), 500, replace=False)
+        train_subset = train_subset.astype(int)
+        axs[0].scatter(
+            np.array(out["train_truths"])[train_subset],
+            np.array(out["train_outputs"])[train_subset],
+            label=model_name,
+            alpha=0.3,
+            s=20,
+            marker="o",
+            color=color_dict[model_name],
+        )
+        axs[0].set_title(r"Training Set (Graph size $M=50$)", fontsize=18)
+
+        # Test data
+        test_subset = np.random.choice(len(out["test_outputs"]), 500, replace=False)
+        test_subset = test_subset.astype(int)
+        axs[1].scatter(
+            np.array(out["test_truths"])[test_subset],
+            np.array(out["test_outputs"])[test_subset],
+            label=model_name,
+            alpha=0.3,
+            s=20,
+            marker="o",
+            color=color_dict[model_name],
+        )
+        axs[1].set_title(r"Test Set (Graph size $M=50$)", fontsize=18)
+
+        # Large test data
+        large_test_subset = np.random.choice(len(out_large["outputs"]), 500, replace=False)
+        large_test_subset = large_test_subset.astype(int)
+        axs[2].scatter(
+            np.array(out_large["truths"])[large_test_subset],
+            np.array(out_large["outputs"])[large_test_subset],
+            label=model_name,
+            alpha=0.3,
+            s=20,
+            marker="o",
+            color=color_dict[model_name],
+        )
+        axs[2].set_title(r"Test Set (Graph size $M\approx 2000$)", fontsize=18)
+    for ax in axs:
+        ax.plot([0, 4], [0, 4], "--", color="black")
+        ax.set_xlim([0, 4])
+        ax.set_ylim([0, 4])
+        ax.set_aspect("equal")
+        ax.set_xlabel("Target", fontsize=15)
+        ax.set_ylabel("Prediction", fontsize=15)
+        ax.legend(fontsize=12)
+
+    plt.tight_layout()
+
+    plt.savefig(
+        os.path.join(
+            params["log_dir"],
+            f"outputs_{params['graph_model']}_{params['task']}.png",
+        )
+    )
+    plt.savefig(
+        os.path.join(
+            params["log_dir"],
+            f"outputs_{params['graph_model']}_{params['task']}.pdf",
+        )
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment set-ups
@@ -181,14 +300,14 @@ if __name__ == "__main__":
         results = {}
 
     model_params = {
-        "IGN": {"model": "ign", "channel_list": [2, 6, 7, 6, 6, 1], "bias": True},
+        "Normalized 2-IGN": {"model": "ign", "channel_list": [2, 6, 7, 6, 6, 1], "bias": True},
         "GNN": {"model": "simple", "channel_list": [1, 18, 18, 18, 18, 1], "bias": True},
-        "GNN-compatible-unreduced": {
+        "GGNN": {
             "model": "unreduced",
             "channel_list": [1, 5, 5, 5, 4, 1],
             "bias": True,
         },
-        "GNN-compatible-reduced": {
+        "Continuous GGNN": {
             "model": "reduced",
             "channel_list": [1, 5, 6, 6, 4, 1],
             "bias": True,
@@ -197,3 +316,6 @@ if __name__ == "__main__":
     for model_name in model_params.keys():
         params["model"] = model_params[model_name]
         train_and_eval(params, args)
+
+    plot_size_generalization()
+    plot_output()

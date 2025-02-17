@@ -154,7 +154,7 @@ class HomDensityDataset(InMemoryDataset):
 
             elif self.graph_model == "full_SBM_Gaussian":
                 # Randomly generate SBM parameters
-                K = random.randint(2, 10)
+                K = random.randint(10, 20)
                 ps = torch.rand((K, K))  # random K x K probability matrix for SBM
                 ps = ps.tril(diagonal=0) + ps.tril(diagonal=-1).transpose(-1, -2)
 
