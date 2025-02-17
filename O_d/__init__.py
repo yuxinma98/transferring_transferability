@@ -6,4 +6,11 @@ color_dict = {
     "OI-DS (Normalized)": "#FFB000",
 }
 
+plot_model_names = {
+    "SVD-DS": "SVD-DS (incompatible)",
+    "SVD-DS (Normalized)": "Normalized SVD-DS (compatible, continuous)",
+    "DS-CI (Normalized)": "Normalized DS-CI \n(asymptotically compatible, continuous)",
+    "DS-CI (Compatible)": "Compatible DS-CI \n(compatible, continuous)",
+    "OI-DS (Normalized)": "Normalized OI-DS \n(approximately compatible, continuous)",
+}
 data_dir = "/export/canton/data/yma93/anydim_transferability/OI-DS/"

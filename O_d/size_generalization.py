@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from Anydim_transferability.O_d.train import train, GWLBDataModule
-from Anydim_transferability.O_d import color_dict, data_dir
-from Anydim_transferability import typesetting
+from Anydim_transferability.O_d import color_dict, data_dir, plot_model_names
+from Anydim_transferability import typesetting, plot_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
@@ -83,7 +83,7 @@ def plot_size_generalization(results, params):
             test_n_range,
             np.mean(mse, axis=0),
             "o-",
-            label=model_name,
+            label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
         plt.fill_between(
@@ -98,7 +98,7 @@ def plot_size_generalization(results, params):
     plt.ylabel("Test MSE", fontsize=18)
     plt.xticks(test_n_range, fontsize=16)
     plt.yticks(fontsize=16)
-    plt.legend(fontsize=16, loc="upper right")
+    plt.legend(fontsize=14, loc="upper right")
 
     # # Second subplot for Spearman Correlation
     # plt.subplot(1, 2, 2)
@@ -128,8 +128,8 @@ def plot_size_generalization(results, params):
     # plt.legend(fontsize=16)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(params["log_dir"], "SVD-DS_plot.png"))
-    plt.savefig(os.path.join(params["log_dir"], "SVD-DS_plot.pdf"))
+    plt.savefig(os.path.join(plot_dir, "SVD-DS_plot.png"))
+    plt.savefig(os.path.join(plot_dir, "SVD-DS_plot.pdf"))
     plt.close()
 
 
@@ -159,7 +159,7 @@ def plot_output(results, params):
         plt.scatter(
             sampled_true_train,
             sampled_train_out,
-            label=model_name,
+            label=plot_model_names[model_name],
             alpha=0.4,
             s=20,
             marker="o",
@@ -188,7 +188,7 @@ def plot_output(results, params):
         plt.scatter(
             sampled_true_test,
             sampled_test_out,
-            label=model_name,
+            label=plot_model_names[model_name],
             alpha=0.4,
             s=20,
             marker="o",
@@ -222,7 +222,7 @@ def plot_output(results, params):
         plt.scatter(
             sampled_true_test,
             sampled_test_out,
-            label=model_name,
+            label=plot_model_names[model_name],
             alpha=0.4,
             s=20,
             marker="o",
@@ -238,8 +238,8 @@ def plot_output(results, params):
     plt.gca().set_aspect("equal")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(params["log_dir"], "SVD-DS_output_plot.png"))
-    plt.savefig(os.path.join(params["log_dir"], "SVD-DS_output_plot.pdf"))
+    plt.savefig(os.path.join(plot_dir, "SVD-DS_output_plot.png"))
+    plt.savefig(os.path.join(plot_dir, "SVD-DS_output_plot.pdf"))
     plt.close()
 
 
