@@ -52,18 +52,3 @@ class PopStatsDataModule(LightningDataModule):
 
     def test_dataloader(self) -> DataLoader:
         return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False)
-
-
-class SubsampledDataset(Dataset):
-    def __init__(self, X, n_samples, set_size):
-        N, d = X.shape[-2], X.shape[-1]
-        self.X = torch.zeros(n_samples, set_size, d)
-        for i in range(n_samples):
-            choices = torch.randint(0, N, (set_size,))
-            self.X[i, :] = X[:, choices, :]
-
-    def __len__(self):
-        return self.X.shape[0]    
-    
-    def __getitem__(self, idx):
-        return self.X[idx]
