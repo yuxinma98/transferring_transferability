@@ -124,11 +124,14 @@ def plot_size_generalization():
         ax.plot(
             np.array(test_n_range),
             np.median(mse_list, axis=0),
+            "o-",
             label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
         ax.fill_between(
             np.array(test_n_range),
+            # np.min(mse_list, axis=0),
+            # np.max(mse_list, axis=0),
             np.percentile(mse_list, 20, axis=0),
             np.percentile(mse_list, 80, axis=0),
             alpha=0.3,
@@ -161,8 +164,8 @@ def plot_output():
     fig, axs = plt.subplots(1, 3, figsize=(14, 5))
     for model_name in model_params.keys():
         model = model_params[model_name]["model"]
-        fname = f"outputs_full_SBM_Gaussian_triangle_{model}.pkl"
-        large_fname = f"outputs_full_SBM_Gaussian_triangle_{model}_largetest.pkl"
+        fname = f"outputs_{params['graph_model']}_{params['task']}_{model}.pkl"
+        large_fname = f"outputs_{params['graph_model']}_{params['task']}_{model}_largetest.pkl"
         with open(os.path.join(params["log_dir"], fname), "rb") as f:
             out = pickle.load(f)
         with open(os.path.join(params["log_dir"], large_fname), "rb") as f:
@@ -208,11 +211,11 @@ def plot_output():
             marker="o",
             color=color_dict[model_name],
         )
-        axs[2].set_title(r"Test Set (Graph size $M\approx 2000$)", fontsize=18)
+        axs[2].set_title(r"Test Set (Graph size $M=2000$)", fontsize=18)
     for ax in axs:
-        ax.plot([0, 4], [0, 4], "--", color="black")
-        ax.set_xlim([0, 4])
-        ax.set_ylim([0, 4])
+        ax.plot([0, 0.06], [0, 0.06], "--", color="black")
+        ax.set_xlim([0, 0.06])
+        ax.set_ylim([0, 0.06])
         ax.set_aspect("equal")
         ax.set_xlabel("Target", fontsize=15)
         ax.set_ylabel("Prediction", fontsize=15)

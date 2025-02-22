@@ -78,7 +78,7 @@ class HomDensityDataset(InMemoryDataset):
             A = torch.distributions.Bernoulli(prob_matrix).sample()
             A = A.tril(diagonal=0) + A.tril(diagonal=-1).transpose(-1, -2)
             # Generate features
-            mu = torch.rand((K, 1)) * 3
+            mu = torch.rand((K, 1))
             x = mu[z]
             if self.task == "triangle":
                 y = torch.einsum("ij,jk,ki,id,jd,kd -> id", A, A, A, x, x, x) / (self.n**2)
