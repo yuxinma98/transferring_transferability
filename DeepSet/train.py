@@ -4,10 +4,11 @@ import pytorch_lightning as pl
 import matplotlib
 import os
 import matplotlib.pyplot as plt
+import wandb
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from Anydim_transferability.DeepSet.model import DeepSet
-from Anydim_transferability.DeepSet.data import PopStatsDataModule, PopStatsDataset
+from Anydim_transferability.DeepSet.data import PopStatsDataModule, HausdorffDataModule
 
 class DeepSetTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:
@@ -60,7 +61,10 @@ class DeepSetTrainingModule(pl.LightningModule):
 
     def on_validation_end(self):
         super().on_validation_end()
-        if self.current_epoch % 50 == 0:
+        if (
+            self.params["name"] == "deepset_size_generalization_popstats"
+            and self.current_epoch % 50 == 0
+        ):
             truth = self.trainer.datamodule.truth
             val = self.trainer.datamodule.val_dataset
             y_pred = self.predict(val.X)
@@ -95,12 +99,9 @@ class DeepSetTrainingModule(pl.LightningModule):
             return self.model(X.to(self.device))
 
 
-def train(params, stopping_threshold=False):
+def train(params, data):
     pl.seed_everything(params["training_seed"])
-    data = PopStatsDataModule(data_dir=params["data_dir"],
-                              task_id = params["task_id"],
-                              batch_size = params["batch_size"],
-                              training_size = params["training_size"])
+    data.prepare_data()
     data.setup()
     params["model"]["in_channels"] = data.d
     model = DeepSetTrainingModule(params)
@@ -110,16 +111,13 @@ def train(params, stopping_threshold=False):
         mode="min",
         monitor="val_mse",
     )
-    early_stopping = pl.callbacks.EarlyStopping(
-        monitor="val_mse", patience=params["max_epochs"], stopping_threshold=1e-3
-    )
     if params["logger"]:
         logger = WandbLogger(
             project=params["project"], name=params["name"], log_model=params["log_checkpoint"], save_dir=params["log_dir"]
         )
         logger.watch(model, log = params["log_model"], log_freq=50)
     trainer = pl.Trainer(
-        callbacks=[model_checkpoint, early_stopping] if stopping_threshold else [model_checkpoint],
+        callbacks=[model_checkpoint],
         devices=1,
         max_epochs=params["max_epochs"],
         logger=logger if params["logger"] else None,
@@ -129,22 +127,5 @@ def train(params, stopping_threshold=False):
     if params["logger"]:
         logger.experiment.unwatch(model)
     trainer.test(model, datamodule=data, verbose=True, ckpt_path="best")
-    if params["training_seed"] == 0 and params["name"] != "deepset_transferability":
-        model.eval()
-        test_data = data.test_dataset
-        test_data_large_n = PopStatsDataset(
-            fname=os.path.join(
-                params["data_dir"], f'task{params["task_id"]}/test_{params["test_n_range"][-1]}.mat'
-            )
-        )
-        with torch.no_grad():
-            y_pred = model.predict(test_data.X)
-            y_pred_out = [test_data.t.tolist(), y_pred.squeeze().tolist()]
-            y_pred_large = model.predict(test_data_large_n.X)
-            y_pred_out_large = [
-                test_data_large_n.t.tolist(),
-                y_pred_large.squeeze().tolist(),
-            ]
-        return model, y_pred_out, y_pred_out_large
-    else:
-        return model, None, None
+    wandb.finish()
+    return model

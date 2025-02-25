@@ -41,11 +41,6 @@ def eval(model, params, test_n_range, record_out=False):
         with torch.no_grad():
             for batch in test_loader:
                 out = model(batch)
-                # batch.y[batch.y == 0] = 1e-9  # avoid division by zero
-                # relative_error = abs(out.reshape(-1) - batch.y) / abs(
-                #     batch.y
-                # )  # dim: (batch_size * n)
-                # test_loss[i] += relative_error.sum().item()
                 test_loss[i] += mean_squared_error(out.reshape(-1), batch.y).item() * len(batch.y)
                 if record_out and n == test_n_range[-1]:
                     outputs.extend(out.reshape(-1).tolist())

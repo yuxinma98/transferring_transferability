@@ -4,6 +4,8 @@ import json
 from torchmetrics import MeanSquaredError
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
+import pickle
 
 from Anydim_transferability.DeepSet.train import train
 from Anydim_transferability.DeepSet.data import PopStatsDataModule, PopStatsDataset
@@ -13,7 +15,8 @@ from Anydim_transferability import typesetting, plot_dir, str2list
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()
 
-def eval(model, params, test_n_range):
+
+def eval(model, model_name, params, test_n_range):
     """
     Evaluate the model on test set with different set sizes
     """
@@ -24,8 +27,34 @@ def eval(model, params, test_n_range):
         dataset = PopStatsDataset(
             fname=os.path.join(params["data_dir"], f'task{params["task_id"]}/test_{N}.mat')
         )
-        y_pred = model.predict(dataset.X)
+        with torch.no_grad():
+            y_pred = model.predict(dataset.X)
         test_mse.append(float(mse(y_pred, dataset.y)))
+        if params["training_seed"]:
+            if N == test_n_range[0]:
+                with open(
+                    os.path.join(
+                        params["log_dir"],
+                        f"popstats_outputs_{params['task_id']}_{model_name}_small.pkl",
+                    ),
+                    "wb",
+                ) as f:
+                    pickle.dump(
+                        [dataset.t, y_pred.squeeze()],
+                        f,
+                    )
+            if N == test_n_range[-1]:
+                with open(
+                    os.path.join(
+                        params["log_dir"],
+                        f"popstats_outputs_{params['task_id']}_{model_name}_large.pkl",
+                    ),
+                    "wb",
+                ) as f:
+                    pickle.dump(
+                        [dataset.t, y_pred.squeeze()],
+                        f,
+                    )
     return test_mse
 
 
@@ -38,15 +67,18 @@ def train_and_eval(params, args, model_name):
                 continue
             params["training_seed"] = seed
             params["model"]["normalization"] = normalizations[model_name]
-            model, test_out, test_out_large_n = train(params)
-            test_mse = eval(model, params, args.test_n_range)
+            data = PopStatsDataModule(
+                data_dir=params["data_dir"],
+                task_id=params["task_id"],
+                batch_size=params["batch_size"],
+                training_size=params["training_size"],
+            )
+            model = train(params, data)
+            test_mse = eval(model, model_name, params, args.test_n_range)
             results[f"task{task_id}"][model_name][str(seed)] = {
                 "mse": test_mse,
             }
-            if seed == 0:  # save predictions for one trial
-                results[f"task{task_id}"][model_name]["test_out"] = test_out
-                results[f"task{task_id}"][model_name]["test_out_large_n"] = test_out_large_n
-            with open(os.path.join(params["log_dir"], "results.json"), "w") as f:
+            with open(os.path.join(params["log_dir"], "results_popstats.json"), "w") as f:
                 json.dump(results, f)
 
 
@@ -109,12 +141,19 @@ def plot_results(results):
         truth = data.truth
         ax = axes[1, task_id - 1]
         for model_name in normalizations.keys():
-            test_out = results[f"task{task_id}"][model_name]["test_out"]
+            with open(
+                os.path.join(
+                    params["log_dir"],
+                    f"popstats_outputs_{task_id}_{model_name}_small.pkl",
+                ),
+                "rb",
+            ) as f:
+                t, test_out = pickle.load(f)
             indices = np.random.choice(
-                len(test_out[0]), subsample_size, replace=False
+                test_out.shape[0], subsample_size, replace=False
             )  # subsample for visualization
-            subsampled_x = np.array(test_out[0])[indices]
-            subsampled_y = np.array(test_out[1])[indices]
+            subsampled_x = t[indices]
+            subsampled_y = test_out[indices]
             ax.scatter(
                 subsampled_x,
                 subsampled_y,
@@ -135,12 +174,19 @@ def plot_results(results):
         # plot predictions for large n
         ax = axes[2, task_id - 1]
         for model_name in normalizations.keys():
-            test_out = results[f"task{task_id}"][model_name]["test_out_large_n"]
+            with open(
+                os.path.join(
+                    params["log_dir"],
+                    f"popstats_outputs_{task_id}_{model_name}_large.pkl",
+                ),
+                "rb",
+            ) as f:
+                t, test_out = pickle.load(f)
             indices = np.random.choice(
-                len(test_out[0]), subsample_size, replace=False
+                test_out.shape[0], subsample_size, replace=False
             )  # subsample for visualization
-            subsampled_x = np.array(test_out[0])[indices]
-            subsampled_y = np.array(test_out[1])[indices]
+            subsampled_x = t[indices]
+            subsampled_y = test_out[indices]
             ax.scatter(
                 subsampled_x,
                 subsampled_y,
@@ -188,7 +234,7 @@ if __name__ == "__main__":
     params = {
         # logger parameters
         "project": "anydim_transferability",
-        "name": "deepset_size_generalization",
+        "name": "deepset_size_generalization_popstats",
         "logger": True,
         "log_checkpoint": False,
         "log_model": None,
@@ -220,7 +266,7 @@ if __name__ == "__main__":
 
     # load results
     try:
-        with open(os.path.join(params["log_dir"], "results.json"), "r") as f:
+        with open(os.path.join(params["log_dir"], "results_popstats.json"), "r") as f:
             results = json.load(f)
     except:
         results = {}
@@ -230,7 +276,7 @@ if __name__ == "__main__":
         "Normalized DeepSet": "mean",
         "PointNet": "max",
     }
-    for models in normalizations.keys():
-        train_and_eval(params, args, models)
+    for model_name in normalizations.keys():
+        train_and_eval(params, args, model_name)
 
     plot_results(results)
