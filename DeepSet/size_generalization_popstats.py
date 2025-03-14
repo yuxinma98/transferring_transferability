@@ -122,7 +122,7 @@ def plot_results(results):
                 color=color_dict[model_name],
             )
         ax.set_yscale("log")
-        ax.set_xlabel("Test set size (M)", fontsize=16)
+        ax.set_xlabel("Test set size (n)", fontsize=16)
         ax.set_ylabel("Test MSE", fontsize=16)
         ax.set_xticks(args.test_n_range)
         ax.tick_params(axis="x", labelsize=12)
@@ -210,6 +210,44 @@ def plot_results(results):
     plt.close()
 
 
+def plot_task_3_mse(results):
+    task_id = 3
+    plt.figure(figsize=(6, 5))
+
+    for model_name in normalizations.keys():
+        mse_list = [
+            results[f"task{task_id}"][model_name][str(seed)]["mse"]
+            for seed in range(args.num_trials)
+        ]
+        mean_mse = np.mean(mse_list, axis=0)
+        plt.plot(
+            args.test_n_range,
+            mean_mse,
+            "o-",
+            label=plot_model_names[model_name],
+            color=color_dict[model_name],
+        )
+        plt.fill_between(
+            args.test_n_range,
+            np.min(mse_list, axis=0),
+            np.max(mse_list, axis=0),
+            alpha=0.3,
+            color=color_dict[model_name],
+        )
+
+    plt.yscale("log")
+    plt.xlabel("Test set size (n)", fontsize=16)
+    plt.ylabel("Test MSE", fontsize=16)
+    plt.xticks(args.test_n_range)
+    plt.tick_params(axis="x", labelsize=12)
+    plt.tick_params(axis="y", labelsize=12)
+    plt.legend(fontsize=12, loc="upper right")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plot_dir, "task_3_mse_plot.pdf"))
+    plt.savefig(os.path.join(plot_dir, "task_3_mse_plot.png"))
+    plt.close()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Experiment set-up
@@ -280,3 +318,4 @@ if __name__ == "__main__":
         train_and_eval(params, args, model_name)
 
     plot_results(results)
+    plot_task_3_mse(results)

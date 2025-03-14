@@ -73,10 +73,9 @@ def train_and_eval(params, args, model_name):
 
 
 def plot_size_generalization(results, params):
-    plt.figure(figsize=(7, 5))
+    plt.figure(figsize=(6, 5))
 
     # First subplot for Test MSE
-    plt.subplot(1, 1, 1)
     for model_name in model_params.keys():
         mse = [results[model_name][str(trial)]["mse"] for trial in range(args.num_trials)]
         plt.plot(
@@ -94,7 +93,7 @@ def plot_size_generalization(results, params):
             color=color_dict[model_name],
         )
     plt.yscale("log")
-    plt.xlabel("Test pointcloud sizes (M)", fontsize=18)
+    plt.xlabel("Test pointcloud sizes (n)", fontsize=18)
     plt.ylabel("Test MSE", fontsize=18)
     plt.xticks(test_n_range, fontsize=16)
     plt.yticks(fontsize=16)
@@ -168,7 +167,7 @@ def plot_output(results, params):
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Training Set \n (Pointcloud size $M=20$)", fontsize=18)
+    plt.title("Training Set \n (Pointcloud size $n=20$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
@@ -197,7 +196,7 @@ def plot_output(results, params):
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set \n (Pointcloud size $M=20$)", fontsize=18)
+    plt.title("Test Set \n (Pointcloud size $n=20$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
@@ -231,7 +230,7 @@ def plot_output(results, params):
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
     plt.xlabel("Target", fontsize=15)
     plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set \n (Pointcloud size $M=500$)", fontsize=18)
+    plt.title("Test Set \n (Pointcloud size $n=500$)", fontsize=18)
     plt.legend(fontsize=12)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)

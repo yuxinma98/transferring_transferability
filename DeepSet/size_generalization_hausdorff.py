@@ -73,28 +73,28 @@ def train_and_eval(params, args, model_name):
 
 
 def plot_results(results):
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    plt.figure(figsize=(6, 5))
     for i, model_name in enumerate(results.keys()):
         mse = np.array([results[model_name][str(seed)]["mse"] for seed in range(args.num_trials)])
-        ax.plot(
+        plt.plot(
             args.test_n_range,
             np.mean(mse, axis=0),
             "o-",
             label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
-        ax.fill_between(
+        plt.fill_between(
             args.test_n_range,
             np.min(mse, axis=0),
             np.max(mse, axis=0),
             alpha=0.3,
             color=color_dict[model_name],
         )
-    ax.set_xlabel("Test set size (M)", fontsize=16)
-    ax.set_ylabel("Test MSE", fontsize=16)
-    ax.set_yscale("log")
-    ax.set_xticks(args.test_n_range)
-    ax.legend(fontsize=14)
+    plt.xlabel("Test set size (n)", fontsize=16)
+    plt.ylabel("Test MSE", fontsize=16)
+    plt.yscale("log")
+    plt.xticks(args.test_n_range)
+    plt.legend(fontsize=14)
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "hausdorff_size_generalization.png"))
     plt.savefig(os.path.join(plot_dir, "hausdorff_size_generalization.pdf"))
@@ -144,8 +144,8 @@ def plot_results(results):
         ax[i].legend(fontsize=12)
         ax[i].tick_params(axis="x", labelsize=12)
         ax[i].tick_params(axis="y", labelsize=12)
-    ax[0].set_title("Test set (Set size $M=20$)", fontsize=18)
-    ax[1].set_title("Test set (Set size $M=200$)", fontsize=18)
+    ax[0].set_title("Test set (Set size $n=20$)", fontsize=18)
+    ax[1].set_title("Test set (Set size $n=200$)", fontsize=18)
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "hausdorff_outputs.png"))
     plt.savefig(os.path.join(plot_dir, "hausdorff_outputs.pdf"))

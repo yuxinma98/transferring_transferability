@@ -111,19 +111,18 @@ def train_and_eval(params, args):
 
 
 def plot_size_generalization():
-    plt.figure(figsize=(8, 5))
-    fig, ax = plt.subplots()
+    plt.figure(figsize=(6, 5))
     for model_name in model_params.keys():
         model = model_params[model_name]["model"]
         mse_list = [results[model][str(seed)] for seed in range(args.num_trials)]
-        ax.plot(
+        plt.plot(
             np.array(test_n_range),
             np.median(mse_list, axis=0),
             "o-",
             label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
-        ax.fill_between(
+        plt.fill_between(
             np.array(test_n_range),
             # np.min(mse_list, axis=0),
             # np.max(mse_list, axis=0),
@@ -132,11 +131,11 @@ def plot_size_generalization():
             alpha=0.3,
             color=color_dict[model_name],
         )
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xlabel("Test graph size (M)", fontsize=16)
-    ax.set_ylabel("Test MSE", fontsize=16)
-    ax.legend(loc="upper right", fontsize=12)
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.xlabel("Test graph size (n)", fontsize=16)
+    plt.ylabel("Test MSE", fontsize=16)
+    plt.legend(loc="upper right", fontsize=12)
     plt.xticks(fontsize=16)
     plt.yticks(fontsize=16)
     plt.tight_layout()
@@ -178,7 +177,7 @@ def plot_output():
             marker="o",
             color=color_dict[model_name],
         )
-        axs[0].set_title(r"Training Set (Graph size $M=50$)", fontsize=18)
+        axs[0].set_title(r"Training Set (Graph size $n=50$)", fontsize=18)
 
         # Test data
         test_subset = np.random.choice(len(out["test_outputs"]), 500, replace=False)
@@ -192,7 +191,7 @@ def plot_output():
             marker="o",
             color=color_dict[model_name],
         )
-        axs[1].set_title(r"Test Set (Graph size $M=50$)", fontsize=18)
+        axs[1].set_title(r"Test Set (Graph size $n=50$)", fontsize=18)
 
         # Large test data
         large_test_subset = np.random.choice(len(out_large["outputs"]), 500, replace=False)
@@ -206,7 +205,7 @@ def plot_output():
             marker="o",
             color=color_dict[model_name],
         )
-        axs[2].set_title(r"Test Set (Graph size $M=2000$)", fontsize=18)
+        axs[2].set_title(r"Test Set (Graph size $n=2000$)", fontsize=18)
     for ax in axs:
         ax.plot([0, 0.06], [0, 0.06], "--", color="black")
         ax.set_xlim([0, 0.06])
