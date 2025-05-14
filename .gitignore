@@ -1,13 +1,10 @@
 .vscode
 GNN/__pycache__
-GNN_movie
 GNN/log
 GNN/data
 DeepSet/generator/data
 DeepSet/__pycache__
 DeepSet/log
-lightning_logs
-DeepSet/generator/data_old
 GNN_size_generalizability/__pycache__
 GNN_size_generalizability/log
 GNN_size_generalizability/data
