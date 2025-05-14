@@ -1,0 +1,22 @@
+channels:
+  - pyg
+  - conda-forge
+  - nvidia
+  - defaults
+dependencies:
+  - python=3.9
+  - pytorch==1.12.1
+  - cudatoolkit=11.6
+  - pyg==2.3.1
+  - pytorch-lightning
+  - ipykernel
+  - matplotlib
+  - torchmetrics
+  - wandb
+  - numpy[version='<2']
+  - h5py
+  - scipy
+  - jax
+  - jaxlib
+  - ott-jax
+  - ipywidgets
