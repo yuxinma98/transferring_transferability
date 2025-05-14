@@ -4,7 +4,6 @@ GNN/log
 GNN/data
 DeepSet/generator/data
 DeepSet/__pycache__
-DeepSet/log
 GNN_size_generalizability/__pycache__
 GNN_size_generalizability/log
 GNN_size_generalizability/data
@@ -14,3 +13,7 @@ __pycache__
 O_n/log
 O_n/__pycache__
 O_d/log
+DeepSet/log/size_generalization/anydim_transferability
+DeepSet/log/size_generalization/wandb
+DeepSet/log/transferability/anydim_transferability
+DeepSet/log/transferability/wandb
