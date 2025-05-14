@@ -1,3 +1,5 @@
+import os
+
 color_dict = {
     "DeepSet": "#FFB000",
     "Normalized DeepSet": "#785ef0",
@@ -6,8 +8,14 @@ color_dict = {
 
 plot_model_names = {
     "DeepSet": "DeepSet (incompatible)",
-    "Normalized DeepSet": "Normalized DeepSet (compatible, continuous)",
-    "PointNet": "PointNet (compatible, discontinuous)",
+    "Normalized DeepSet": "Normalized DeepSet (transferable)",
+    "PointNet": "PointNet (compatible, not transferable)",
 }
 
-data_dir = "/export/canton/data/yma93/anydim_transferability/deepset/"
+plot_model_names_hausdorff = {
+    "DeepSet": "DeepSet (incompatible)",
+    "Normalized DeepSet": "Normalized DeepSet \n(compatible, not transferable)",
+    "PointNet": "PointNet (transferable)",
+}
+
+data_dir = f"{os.environ.get('DATA_DIR')}/anydim_transferability/deepset/"

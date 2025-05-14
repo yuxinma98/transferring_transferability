@@ -1,3 +1,5 @@
+import os
+
 color_dict = {
     "GNN": "#dc267f",
     "IGN": "#fe6100",
@@ -7,10 +9,10 @@ color_dict = {
 }
 
 plot_model_names = {
-    "GNN": "GNN (compatible, continuous)",
+    "GNN": "GNN (transferable)",
     "IGN": "Normalized 2-IGN (incompatible)",
-    "GGNN": "GGNN (compatible, discontinuous)",
-    "Continuous GGNN": "Continuous GGNN (compatible, continuous)",
+    "GGNN": "GGNN (compatible, not transferable)",
+    "Continuous GGNN": "Continuous GGNN (transferable)",
 }
 
-data_dir = "/export/canton/data/yma93/anydim_transferability/GNN/"
+data_dir = f"{os.environ.get('DATA_DIR')}/anydim_transferability/GNN/"

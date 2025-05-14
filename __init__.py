@@ -2,9 +2,9 @@ from typing import Union
 import argparse
 import numpy as np
 import matplotlib
+from pathlib import Path
 
-
-plot_dir = "/cis/home/yma93/projects/Anydim_transferability/plots/"
+plot_dir = Path(__file__).parent / "plots"
 
 def nrange(value: Union[str, list]) -> list:
     if isinstance(value, list):
