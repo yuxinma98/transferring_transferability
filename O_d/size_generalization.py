@@ -73,58 +73,33 @@ def train_and_eval(params, args, model_name):
 
 
 def plot_size_generalization(results, params):
-    plt.figure(figsize=(6, 5))
-
+    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    fig = plt.figure(figsize=(5, 4))
+    ax = fig.add_axes(axes_rect)
     # First subplot for Test MSE
     for model_name in model_params.keys():
         mse = [results[model_name][str(trial)]["mse"] for trial in range(args.num_trials)]
-        plt.plot(
+        ax.plot(
             test_n_range,
             np.mean(mse, axis=0),
             "o-",
             label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
-        plt.fill_between(
+        ax.fill_between(
             test_n_range,
             np.min(mse, axis=0),
             np.max(mse, axis=0),
             alpha=0.3,
             color=color_dict[model_name],
         )
-    plt.yscale("log")
-    plt.xlabel("Test pointcloud sizes (n)", fontsize=18)
-    plt.ylabel("Test MSE", fontsize=18)
-    plt.xticks(test_n_range, fontsize=16)
-    plt.yticks(fontsize=16)
-    plt.legend(fontsize=14, loc="upper right")
-
-    # # Second subplot for Spearman Correlation
-    # plt.subplot(1, 2, 2)
-    # for model_name in model_params.keys():
-    #     rank_corr = [
-    #         results[model_name][str(trial)]["rank_corr"] for trial in range(args.num_trials)
-    #     ]
-    #     plt.plot(
-    #         test_n_range,
-    #         np.mean(rank_corr, axis=0),
-    #         "o-",
-    #         label=model_name,
-    #         color=color_dict[model_name],
-    #     )
-    #     plt.fill_between(
-    #         test_n_range,
-    #         np.min(rank_corr, axis=0),
-    #         np.max(rank_corr, axis=0),
-    #         alpha=0.3,
-    #         color=color_dict[model_name],
-    #     )
-
-    # plt.xlabel("Test point cloud sizes (N)", fontsize=18)
-    # plt.ylabel("Rank Correlation", fontsize=18)
-    # plt.xticks(test_n_range, fontsize=16)
-    # plt.yticks(fontsize=16)
-    # plt.legend(fontsize=16)
+    ax.set_yscale("log")
+    ax.set_xlabel("Test pointcloud sizes (n)", fontsize=20)
+    ax.set_ylabel("Test MSE", fontsize=20)
+    ax.set_xticks(test_n_range)
+    ax.tick_params(axis="x", labelsize=18)
+    ax.tick_params(axis="y", labelsize=18)
+    plt.legend(fontsize=13, loc="upper right")
 
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "SVD-DS_plot.png"))
@@ -294,7 +269,7 @@ if __name__ == "__main__":
         },
         "DS-CI (Normalized)": {"hid_dim": 10, "out_dim": 10},
         # "DS-CI (Compatible)": {"hid_dim": 10, "out_dim": 10},
-        "OI-DS (Normalized)": {"hid_dim": 12, "out_dim": 12},
+        # "OI-DS (Normalized)": {"hid_dim": 12, "out_dim": 12},
     }
     test_n_range = [20, 100, 200, 300, 500]
     for model_name in model_params.keys():

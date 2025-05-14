@@ -9,7 +9,7 @@ import pickle
 
 from Anydim_transferability.DeepSet.train import train
 from Anydim_transferability.DeepSet.data import HausdorffDataset, HausdorffDataModule
-from Anydim_transferability.DeepSet import color_dict, data_dir, plot_model_names
+from Anydim_transferability.DeepSet import color_dict, data_dir, plot_model_names_hausdorff
 from Anydim_transferability import typesetting, plot_dir, str2list
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -73,29 +73,33 @@ def train_and_eval(params, args, model_name):
 
 
 def plot_results(results):
-    plt.figure(figsize=(6, 5))
+    fig = plt.figure(figsize=(5, 4))
+    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    ax = fig.add_axes(axes_rect)
     for i, model_name in enumerate(results.keys()):
         mse = np.array([results[model_name][str(seed)]["mse"] for seed in range(args.num_trials)])
-        plt.plot(
+        ax.plot(
             args.test_n_range,
             np.mean(mse, axis=0),
             "o-",
-            label=plot_model_names[model_name],
+            label=plot_model_names_hausdorff[model_name],
             color=color_dict[model_name],
         )
-        plt.fill_between(
+        ax.fill_between(
             args.test_n_range,
             np.min(mse, axis=0),
             np.max(mse, axis=0),
             alpha=0.3,
             color=color_dict[model_name],
         )
-    plt.xlabel("Test set size (n)", fontsize=16)
-    plt.ylabel("Test MSE", fontsize=16)
-    plt.yscale("log")
-    plt.xticks(args.test_n_range)
-    plt.legend(fontsize=14)
-    plt.tight_layout()
+    ax.set_xlabel("Test set size (n)", fontsize=20)
+    ax.set_ylabel("Test MSE", fontsize=20)
+    ax.set_yscale("log")
+    ax.set_xticks(args.test_n_range)
+    ax.tick_params(axis="x", labelsize=18)
+    ax.tick_params(axis="y", labelsize=18)
+    ax.legend(fontsize=13, loc="upper right")
+    # plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "hausdorff_size_generalization.png"))
     plt.savefig(os.path.join(plot_dir, "hausdorff_size_generalization.pdf"))
     plt.close()
@@ -112,7 +116,7 @@ def plot_results(results):
         ax[0].scatter(
             subsampled_x,
             subsampled_y,
-            label=plot_model_names[model_name],
+            label=plot_model_names_hausdorff[model_name],
             marker="o",
             alpha=0.3,
             s=20,
@@ -129,7 +133,7 @@ def plot_results(results):
         ax[1].scatter(
             subsampled_x,
             subsampled_y,
-            label=plot_model_names[model_name],
+            label=plot_model_names_hausdorff[model_name],
             marker="o",
             alpha=0.3,
             s=20,

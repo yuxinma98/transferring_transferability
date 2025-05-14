@@ -212,7 +212,9 @@ def plot_results(results):
 
 def plot_task_3_mse(results):
     task_id = 3
-    plt.figure(figsize=(6, 5))
+    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    fig = plt.figure(figsize=(5, 4))
+    ax = fig.add_axes(axes_rect)
 
     for model_name in normalizations.keys():
         mse_list = [
@@ -220,14 +222,14 @@ def plot_task_3_mse(results):
             for seed in range(args.num_trials)
         ]
         mean_mse = np.mean(mse_list, axis=0)
-        plt.plot(
+        ax.plot(
             args.test_n_range,
             mean_mse,
             "o-",
             label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
-        plt.fill_between(
+        ax.fill_between(
             args.test_n_range,
             np.min(mse_list, axis=0),
             np.max(mse_list, axis=0),
@@ -235,14 +237,14 @@ def plot_task_3_mse(results):
             color=color_dict[model_name],
         )
 
-    plt.yscale("log")
-    plt.xlabel("Test set size (n)", fontsize=16)
-    plt.ylabel("Test MSE", fontsize=16)
-    plt.xticks(args.test_n_range)
-    plt.tick_params(axis="x", labelsize=12)
-    plt.tick_params(axis="y", labelsize=12)
-    plt.legend(fontsize=12, loc="upper right")
-    plt.tight_layout()
+    ax.set_yscale("log")
+    ax.set_xlabel("Test set size (n)", fontsize=20)
+    ax.set_ylabel("Test MSE", fontsize=20)
+    ax.set_xticks(args.test_n_range[::2])
+    ax.tick_params(axis="x", labelsize=18)
+    ax.tick_params(axis="y", labelsize=18)
+    ax.legend(fontsize=13, loc="upper right")
+    # plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "task_3_mse_plot.pdf"))
     plt.savefig(os.path.join(plot_dir, "task_3_mse_plot.png"))
     plt.close()

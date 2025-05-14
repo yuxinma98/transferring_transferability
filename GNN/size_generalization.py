@@ -111,18 +111,20 @@ def train_and_eval(params, args):
 
 
 def plot_size_generalization():
-    plt.figure(figsize=(6, 5))
+    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    fig = plt.figure(figsize=(5, 4))
+    ax = fig.add_axes(axes_rect)
     for model_name in model_params.keys():
         model = model_params[model_name]["model"]
         mse_list = [results[model][str(seed)] for seed in range(args.num_trials)]
-        plt.plot(
+        ax.plot(
             np.array(test_n_range),
             np.median(mse_list, axis=0),
             "o-",
             label=plot_model_names[model_name],
             color=color_dict[model_name],
         )
-        plt.fill_between(
+        ax.fill_between(
             np.array(test_n_range),
             # np.min(mse_list, axis=0),
             # np.max(mse_list, axis=0),
@@ -131,13 +133,13 @@ def plot_size_generalization():
             alpha=0.3,
             color=color_dict[model_name],
         )
-    plt.xscale("log")
-    plt.yscale("log")
-    plt.xlabel("Test graph size (n)", fontsize=16)
-    plt.ylabel("Test MSE", fontsize=16)
-    plt.legend(loc="upper right", fontsize=12)
-    plt.xticks(fontsize=16)
-    plt.yticks(fontsize=16)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Test graph size (n)", fontsize=20)
+    ax.set_ylabel("Test MSE", fontsize=20)
+    ax.legend(loc="upper right", fontsize=13)
+    ax.tick_params(axis="x", labelsize=18)
+    ax.tick_params(axis="y", labelsize=18)
     plt.tight_layout()
     plt.savefig(
         os.path.join(
