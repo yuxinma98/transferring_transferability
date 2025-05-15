@@ -1,6 +1,5 @@
 .vscode
 GNN/__pycache__
-GNN/log
 GNN/data
 DeepSet/generator/data
 DeepSet/__pycache__
@@ -23,3 +22,4 @@ GNN/log/size_generalization/wandb
 O_d/log/size_generalization/old_results
 O_d/log/size_generalization/wandb
 O_d/log/size_generalization/anydim_transferability
+GNN/log/transferability
