@@ -212,7 +212,7 @@ def plot_results(results):
 
 def plot_task_3_mse(results):
     task_id = 3
-    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    axes_rect = [0.19, 0.16, 0.8, 0.81]
     fig = plt.figure(figsize=(5, 4))
     ax = fig.add_axes(axes_rect)
 

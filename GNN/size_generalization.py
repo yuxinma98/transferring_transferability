@@ -111,7 +111,7 @@ def train_and_eval(params, args):
 
 
 def plot_size_generalization():
-    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    axes_rect = [0.19, 0.16, 0.8, 0.81]
     fig = plt.figure(figsize=(5, 4))
     ax = fig.add_axes(axes_rect)
     for model_name in model_params.keys():
@@ -137,10 +137,14 @@ def plot_size_generalization():
     ax.set_yscale("log")
     ax.set_xlabel("Test graph size (n)", fontsize=20)
     ax.set_ylabel("Test MSE", fontsize=20)
-    ax.legend(loc="upper right", fontsize=13)
+    ax.set_xticks(test_n_range)
+    ax.set_xticklabels(test_n_range)
+    if params["graph_model"] == "SBM":
+        ax.legend(fontsize=13)
+    else:
+        ax.legend(loc="upper right", fontsize=13)
     ax.tick_params(axis="x", labelsize=18)
     ax.tick_params(axis="y", labelsize=18)
-    plt.tight_layout()
     plt.savefig(
         os.path.join(
             plot_dir,
@@ -157,7 +161,7 @@ def plot_size_generalization():
 
 
 def plot_output():
-    fig, axs = plt.subplots(1, 3, figsize=(14, 5))
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
     for model_name in model_params.keys():
         model = model_params[model_name]["model"]
         fname = f"outputs_{params['graph_model']}_{params['task']}_{model}.pkl"
@@ -167,24 +171,24 @@ def plot_output():
         with open(os.path.join(params["log_dir"], large_fname), "rb") as f:
             out_large = pickle.load(f)
 
-        # Training data
-        train_subset = np.random.choice(len(out["train_outputs"]), 500, replace=False)
-        train_subset = train_subset.astype(int)
-        axs[0].scatter(
-            np.array(out["train_truths"])[train_subset],
-            np.array(out["train_outputs"])[train_subset],
-            label=plot_model_names[model_name],
-            alpha=0.3,
-            s=20,
-            marker="o",
-            color=color_dict[model_name],
-        )
-        axs[0].set_title(r"Training Set (Graph size $n=50$)", fontsize=18)
+        # # Training data
+        # train_subset = np.random.choice(len(out["train_outputs"]), 500, replace=False)
+        # train_subset = train_subset.astype(int)
+        # axs[0].scatter(
+        #     np.array(out["train_truths"])[train_subset],
+        #     np.array(out["train_outputs"])[train_subset],
+        #     label=plot_model_names[model_name],
+        #     alpha=0.3,
+        #     s=20,
+        #     marker="o",
+        #     color=color_dict[model_name],
+        # )
+        # axs[0].set_title(r"Training Set (Graph size $n=50$)", fontsize=18)
 
         # Test data
         test_subset = np.random.choice(len(out["test_outputs"]), 500, replace=False)
         test_subset = test_subset.astype(int)
-        axs[1].scatter(
+        axs[0].scatter(
             np.array(out["test_truths"])[test_subset],
             np.array(out["test_outputs"])[test_subset],
             label=plot_model_names[model_name],
@@ -193,12 +197,12 @@ def plot_output():
             marker="o",
             color=color_dict[model_name],
         )
-        axs[1].set_title(r"Test Set (Graph size $n=50$)", fontsize=18)
+        axs[0].set_title(r"Model output on graph size $n_{test}=50$", fontsize=18)
 
         # Large test data
         large_test_subset = np.random.choice(len(out_large["outputs"]), 500, replace=False)
         large_test_subset = large_test_subset.astype(int)
-        axs[2].scatter(
+        axs[1].scatter(
             np.array(out_large["truths"])[large_test_subset],
             np.array(out_large["outputs"])[large_test_subset],
             label=plot_model_names[model_name],
@@ -207,15 +211,16 @@ def plot_output():
             marker="o",
             color=color_dict[model_name],
         )
-        axs[2].set_title(r"Test Set (Graph size $n=2000$)", fontsize=18)
+        axs[1].set_title(r"Model output on graph size $n_{test}=2000$", fontsize=18)
     for ax in axs:
         ax.plot([0, 0.06], [0, 0.06], "--", color="black")
         ax.set_xlim([0, 0.06])
         ax.set_ylim([0, 0.06])
         ax.set_aspect("equal")
-        ax.set_xlabel("Target", fontsize=15)
-        ax.set_ylabel("Prediction", fontsize=15)
-        ax.legend(fontsize=12)
+        ax.set_xlabel("Target", fontsize=16)
+        ax.set_ylabel("Prediction", fontsize=16)
+        ax.tick_params(axis="both", labelsize=14)
+        ax.legend(fontsize=12, loc="upper right")
 
     plt.tight_layout()
 

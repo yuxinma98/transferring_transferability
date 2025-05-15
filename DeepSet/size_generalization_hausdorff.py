@@ -74,7 +74,7 @@ def train_and_eval(params, args, model_name):
 
 def plot_results(results):
     fig = plt.figure(figsize=(5, 4))
-    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    axes_rect = [0.19, 0.16, 0.8, 0.81]
     ax = fig.add_axes(axes_rect)
     for i, model_name in enumerate(results.keys()):
         mse = np.array([results[model_name][str(seed)]["mse"] for seed in range(args.num_trials)])
@@ -95,7 +95,7 @@ def plot_results(results):
     ax.set_xlabel("Test set size (n)", fontsize=20)
     ax.set_ylabel("Test MSE", fontsize=20)
     ax.set_yscale("log")
-    ax.set_xticks(args.test_n_range)
+    ax.set_xticks(args.test_n_range[::2])
     ax.tick_params(axis="x", labelsize=18)
     ax.tick_params(axis="y", labelsize=18)
     ax.legend(fontsize=13, loc="upper right")
@@ -143,13 +143,13 @@ def plot_results(results):
         ax[i].plot([0, 4], [0, 4], "--", color="black")
         ax[i].set_xlim([0, 4])
         ax[i].set_ylim([0, 4])
-        ax[i].set_xlabel("True Hausdorff distance", fontsize=16)
-        ax[i].set_ylabel("Predicted Hausdorff distance", fontsize=16)
-        ax[i].legend(fontsize=12)
-        ax[i].tick_params(axis="x", labelsize=12)
-        ax[i].tick_params(axis="y", labelsize=12)
-    ax[0].set_title("Test set (Set size $n=20$)", fontsize=18)
-    ax[1].set_title("Test set (Set size $n=200$)", fontsize=18)
+        ax[i].set_xlabel("True distance", fontsize=18)
+        ax[i].set_ylabel("Predicted distance", fontsize=18)
+        ax[i].legend(fontsize=16, loc="upper right")
+        ax[i].tick_params(axis="x", labelsize=16)
+        ax[i].tick_params(axis="y", labelsize=16)
+    ax[0].set_title("Model outputs on set-size $n_{test}=20$)", fontsize=20)
+    ax[1].set_title("Model outputs on set-size $n_{test}=200$)", fontsize=20)
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "hausdorff_outputs.png"))
     plt.savefig(os.path.join(plot_dir, "hausdorff_outputs.pdf"))

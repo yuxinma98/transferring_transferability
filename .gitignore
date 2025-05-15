@@ -12,8 +12,14 @@ O(n)/log
 __pycache__
 O_n/log
 O_n/__pycache__
-O_d/log
 DeepSet/log/size_generalization/anydim_transferability
 DeepSet/log/size_generalization/wandb
 DeepSet/log/transferability/anydim_transferability
 DeepSet/log/transferability/wandb
+GNN/log/size_generalization/large_test size
+GNN/log/size_generalization/save
+GNN/log/size_generalization/anydim_transferability
+GNN/log/size_generalization/wandb
+O_d/log/size_generalization/old_results
+O_d/log/size_generalization/wandb
+O_d/log/size_generalization/anydim_transferability

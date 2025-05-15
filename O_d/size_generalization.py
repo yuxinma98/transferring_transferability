@@ -73,7 +73,7 @@ def train_and_eval(params, args, model_name):
 
 
 def plot_size_generalization(results, params):
-    axes_rect = [0.19, 0.15, 0.8, 0.82]
+    axes_rect = [0.19, 0.16, 0.8, 0.81]
     fig = plt.figure(figsize=(5, 4))
     ax = fig.add_axes(axes_rect)
     # First subplot for Test MSE
@@ -100,8 +100,6 @@ def plot_size_generalization(results, params):
     ax.tick_params(axis="x", labelsize=18)
     ax.tick_params(axis="y", labelsize=18)
     plt.legend(fontsize=13, loc="upper right")
-
-    plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "SVD-DS_plot.png"))
     plt.savefig(os.path.join(plot_dir, "SVD-DS_plot.pdf"))
     plt.close()
@@ -114,42 +112,42 @@ def plot_output(results, params):
     )
     data.prepare_data()
 
-    plt.figure(figsize=(14, 5))
+    plt.figure(figsize=(10, 5))
 
-    # First subplot for Training Set
-    # Define the proportion of data to sample
+    # # First subplot for Training Set
+    # # Define the proportion of data to sample
     sample_proportion = 0.3
 
-    plt.subplot(1, 3, 1)
-    for model_name in model_params.keys():
-        # Randomly subsample indices
-        num_samples = int(len(data.dist_true_train) * sample_proportion)
-        sampled_indices = np.random.choice(len(data.dist_true_train), num_samples, replace=False)
+    # plt.subplot(1, 3, 1)
+    # for model_name in model_params.keys():
+    #     # Randomly subsample indices
+    #     num_samples = int(len(data.dist_true_train) * sample_proportion)
+    #     sampled_indices = np.random.choice(len(data.dist_true_train), num_samples, replace=False)
 
-        # Subsample the data
-        sampled_true_train = data.dist_true_train[sampled_indices]
-        sampled_train_out = np.array(results[model_name]["train_out"])[sampled_indices]
+    #     # Subsample the data
+    #     sampled_true_train = data.dist_true_train[sampled_indices]
+    #     sampled_train_out = np.array(results[model_name]["train_out"])[sampled_indices]
 
-        plt.scatter(
-            sampled_true_train,
-            sampled_train_out,
-            label=plot_model_names[model_name],
-            alpha=0.4,
-            s=20,
-            marker="o",
-            color=color_dict[model_name],
-        )
-    plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
-    plt.xlabel("Target", fontsize=15)
-    plt.ylabel("Prediction", fontsize=15)
-    plt.title("Training Set \n (Pointcloud size $n=20$)", fontsize=18)
-    plt.legend(fontsize=12)
-    plt.xlim(0, 1.8)
-    plt.ylim(0, 1.8)
-    plt.gca().set_aspect("equal")
+    #     plt.scatter(
+    #         sampled_true_train,
+    #         sampled_train_out,
+    #         label=plot_model_names[model_name],
+    #         alpha=0.4,
+    #         s=20,
+    #         marker="o",
+    #         color=color_dict[model_name],
+    #     )
+    # plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
+    # plt.xlabel("Target", fontsize=15)
+    # plt.ylabel("Prediction", fontsize=15)
+    # plt.title("Training Set \n (Pointcloud size $n=20$)", fontsize=18)
+    # plt.legend(fontsize=12)
+    # plt.xlim(0, 1.8)
+    # plt.ylim(0, 1.8)
+    # plt.gca().set_aspect("equal")
 
     # Second subplot for Test Set
-    plt.subplot(1, 3, 2)
+    plt.subplot(1, 2, 1)
     for model_name in model_params.keys():
         # Randomly subsample indices
         num_samples = int(len(data.dist_true_test) * sample_proportion)
@@ -169,10 +167,10 @@ def plot_output(results, params):
             color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
-    plt.xlabel("Target", fontsize=15)
-    plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set \n (Pointcloud size $n=20$)", fontsize=18)
-    plt.legend(fontsize=12)
+    plt.xlabel("Target", fontsize=18)
+    plt.ylabel("Prediction", fontsize=18)
+    plt.title("Model output on \n pointcloud size $n_{test}=20$", fontsize=20)
+    plt.legend(fontsize=13)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
     plt.gca().set_aspect("equal")
@@ -183,7 +181,7 @@ def plot_output(results, params):
     )
     data.prepare_data()
     # Third subplot for Test Set with large n
-    plt.subplot(1, 3, 3)
+    plt.subplot(1, 2, 2)
     for model_name in model_params.keys():
         # Randomly subsample indices
         num_samples = int(len(data.dist_true_test) * sample_proportion)
@@ -203,15 +201,13 @@ def plot_output(results, params):
             color=color_dict[model_name],
         )
     plt.plot(np.linspace(0, 1.8, 100), np.linspace(0, 1.8, 100), ls=":", color="gray", alpha=0.5)
-    plt.xlabel("Target", fontsize=15)
-    plt.ylabel("Prediction", fontsize=15)
-    plt.title("Test Set \n (Pointcloud size $n=500$)", fontsize=18)
-    plt.legend(fontsize=12)
+    plt.xlabel("Target", fontsize=18)
+    plt.ylabel("Prediction", fontsize=18)
+    plt.title("Model output on \n pointcloud size $n_{test}=500$", fontsize=20)
+    plt.legend(fontsize=13)
     plt.xlim(0, 1.8)
     plt.ylim(0, 1.8)
     plt.gca().set_aspect("equal")
-
-    plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "SVD-DS_output_plot.png"))
     plt.savefig(os.path.join(plot_dir, "SVD-DS_output_plot.pdf"))
     plt.close()
