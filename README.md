@@ -55,14 +55,19 @@ The transferability experiments, which evaluate the outputs of untrained, random
    The implementation of IGN (`GNN/ign_layers.py`) is taken from the original repository of [HyTruongSon](https://github.com/HyTruongSon/InvariantGraphNetworks-PyTorch), which is an unofficial implementation of the IGN paper [2].
 ### **Size generalization on point clouds**
 * To generate the data, run the following command:
-```bash
-python -m Anydim_transferability.O_d.data_generator
-```
+   ```bash
+   python -m Anydim_transferability.O_d.data_generator
+   ```
+   The code for data generation is partially adapted from the original repository by [nhuang37](https://github.nhuang37/InvariantFeatures/), which is associated with the paper [3].
 * To rerun the size generalization experiment, first delete the corresponding log files in `O_d/log/size_generalization`, then run:
-     ```bash
-     python -m Anydim_transferability.O_d.size_generalization
-     ```
+   ```bash
+   python -m Anydim_transferability.O_d.size_generalization
+   ```
+   The implementation of DS-CI and OI-DS is also adapted from [nhuang37](https://github.com/nhuang37/InvariantFeatures/).
 
 ## Reference
-[1] Zaheer, Manzil, et al. "Deep sets." Advances in neural information processing systems 30 (2017).
-[2] Maron, Haggai, et al. "Invariant and equivariant graph networks." arXiv preprint arXiv:1812.09902 (2018).
+[1] Zaheer, M., Kottur, S., Ravanbakhsh, S., Poczos, B., Salakhutdinov, R.R. and Smola, A.J., 2017. Deep sets. Advances in neural information processing systems, 30.
+
+[2] Maron, H., Ben-Hamu, H., Shamir, N. and Lipman, Y., 2018. Invariant and equivariant graph networks. arXiv preprint arXiv:1812.09902.
+
+[3] Blum-Smith, B., Huang, N., Cuturi, M. and Villar, S., 2024. Learning functions on symmetric matrices and point clouds via lightweight invariant features. CoRR.
