@@ -9,7 +9,7 @@ color_dict = {
 }
 
 plot_model_names = {
-    "SVD-DS": "SVD-DS (incompatible)",
+    "SVD-DS": "Unnormalized SVD-DS (incompatible)",
     "SVD-DS (Normalized)": "Normalized SVD-DS (transferable)",
     "DS-CI (Normalized)": "Normalized DS-CI \n(approximately transferable)",
     "DS-CI (Compatible)": "Compatible DS-CI \n(transferable)",
