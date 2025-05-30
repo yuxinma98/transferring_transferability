@@ -4,11 +4,16 @@ This repository is the official implementation of **On Transferring Transferabil
 ## Requirements
 
 * **Python:** Python 3.9
-* **Dependencies:** See `environment.yml` for the full list of required packages.
-If you have Anaconda or Miniconda installed, you can run the following command to  create a new Conda environment named `transferability`  and install all required packages. You may need to adjust the `environment.yml` file if you do not have a GPU with CUDA support.
+* **Dependencies:** See `environment.yml` for the full list of required packages. Please install Anaconda or Miniconda, and run the following command to create a new Conda environment named `transferability` and install all required packages. You may need to adjust the `environment.yml` file if you do not have a GPU with CUDA support.
     ```bash
     conda env create -f environment.yml -n transferability
     ```
+* **Project installation**: After creating the Conda environment, activate it and install the project in editable mode:
+   ```bash
+   conda activate transferability
+   pip install -e .
+   ```
+   This will allow you to import and use the project code directly during development.
 
 ## Run the Transferability Experiments
 

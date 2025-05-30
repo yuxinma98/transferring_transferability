@@ -7,10 +7,10 @@ import numpy as np
 import torch
 import pickle
 
-from Anydim_transferability.DeepSet.train import train
-from Anydim_transferability.DeepSet.data import HausdorffDataset, HausdorffDataModule
-from Anydim_transferability.DeepSet import color_dict, data_dir, plot_model_names_hausdorff
-from Anydim_transferability import typesetting, plot_dir, str2list
+from transferring_transferability.DeepSet.train import train
+from transferring_transferability.DeepSet.data import HausdorffDataset, HausdorffDataModule
+from transferring_transferability.DeepSet import color_dict, data_dir, plot_model_names_hausdorff
+from transferring_transferability import typesetting, plot_dir, str2list
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()

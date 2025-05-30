@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import wandb
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-from Anydim_transferability.DeepSet.model import DeepSet
-from Anydim_transferability.DeepSet.data import PopStatsDataModule, HausdorffDataModule
+from transferring_transferability.DeepSet.model import DeepSet
+from transferring_transferability.DeepSet.data import PopStatsDataModule, HausdorffDataModule
 
 class DeepSetTrainingModule(pl.LightningModule):
     def __init__(self, params: dict) -> None:

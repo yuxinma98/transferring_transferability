@@ -9,8 +9,8 @@ from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
 import torch_geometric.utils as pyg_utils
 
-from Anydim_transferability.GNN.data import HomDensityDataset
-from Anydim_transferability.GNN.model import GNN
+from transferring_transferability.GNN.data import HomDensityDataset
+from transferring_transferability.GNN.model import GNN
 
 
 def train(params):

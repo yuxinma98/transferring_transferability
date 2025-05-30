@@ -6,9 +6,9 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Anydim_transferability.O_d.train import train, GWLBDataModule
-from Anydim_transferability.O_d import color_dict, data_dir, plot_model_names
-from Anydim_transferability import typesetting, plot_dir
+from transferring_transferability.O_d.train import train, GWLBDataModule
+from transferring_transferability.O_d import color_dict, data_dir, plot_model_names
+from transferring_transferability import typesetting, plot_dir
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()

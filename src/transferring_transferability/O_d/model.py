@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchmetrics.functional.pairwise import pairwise_euclidean_distance
 from torch_geometric.nn.models import MLP
 
-from Anydim_transferability.DeepSet.model import DeepSet
+from transferring_transferability.DeepSet.model import DeepSet
 
 
 class SiameseRegressor(torch.nn.Module):

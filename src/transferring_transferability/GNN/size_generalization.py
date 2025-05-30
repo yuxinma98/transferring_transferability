@@ -10,10 +10,10 @@ from torchmetrics import MeanSquaredError
 from tqdm import tqdm
 import pickle, os
 
-from Anydim_transferability.GNN.train import train
-from Anydim_transferability.GNN.data import HomDensityDataset
-from Anydim_transferability.GNN import data_dir, color_dict, plot_model_names
-from Anydim_transferability import typesetting, nrange, plot_dir, str2list
+from transferring_transferability.GNN.train import train
+from transferring_transferability.GNN.data import HomDensityDataset
+from transferring_transferability.GNN import data_dir, color_dict, plot_model_names
+from transferring_transferability import typesetting, nrange, plot_dir, str2list
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 typesetting()

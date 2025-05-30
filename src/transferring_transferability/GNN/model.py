@@ -2,7 +2,7 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from torch import Tensor
-from Anydim_transferability.GNN.ign_layers import (
+from transferring_transferability.GNN.ign_layers import (
     layer_2_to_2,
     layer_2_to_1,
     layer_2_to_1_anydim,
