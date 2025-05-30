@@ -58,7 +58,7 @@ The transferability experiments, which evaluate the outputs of untrained, random
    ```bash
    python -m Anydim_transferability.O_d.data_generator
    ```
-   The code for data generation is partially adapted from the original repository by [nhuang37](https://github.nhuang37/InvariantFeatures/), which is associated with the paper [3].
+   The code for data generation is partially adapted from the original repository by [nhuang37](https://github.com/nhuang37/InvariantFeatures), which is associated with the paper [3].
 * To rerun the size generalization experiment, first delete the corresponding log files in `O_d/log/size_generalization`, then run:
    ```bash
    python -m Anydim_transferability.O_d.size_generalization
