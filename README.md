@@ -1,5 +1,5 @@
 # On Transferring Transferability
-This repository is the official implementation of [**On Transferring Transferability: Towards a Theory for Size Generalization**](https://arxiv.org/abs/2505.23599). 
+This repository is the official implementation of **On Transferring Transferability: Towards a Theory for Size Generalization**.
 
 ## Requirements
 
