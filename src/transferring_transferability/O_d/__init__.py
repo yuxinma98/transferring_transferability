@@ -16,4 +16,4 @@ plot_model_names = {
     # "OI-DS (Normalized)": "Normalized OI-DS \n(approximately compatible, continuous)",
 }
 
-data_dir = f"{os.environ.get('DATA_DIR')}/anydim_transferability/OI-DS/"
+data_dir = f"{os.environ.get('DATA_DIR')}/anydim_transferability/O_d/"

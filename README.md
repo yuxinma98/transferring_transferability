@@ -36,11 +36,11 @@ The transferability experiments, which evaluate the outputs of untrained, random
 ### Size Generalization on Sets
 
 1. **Experiment 1: Population Statistics**
-   * To generate the data, run the following command:
+   * To generate the data, run the following command and copy the data to `your_data_dir/anydim_transferability/deepset/`.
      ```bash
      bash src/transferring_transferability/DeepSet/data_generator/generate.sh
      ```
-     Note: This requires MatLab. Alternatively, you can directly download the data [here](https://www.dropbox.com/scl/fi/3rx5fy519xvgbb26rt1ga/ModelNet.zip?rlkey=vkny9ajqqhes7jujxpbiqyf7r&st=lvqcvmrn&dl=0).
+     Note: This requires MatLab. 
       * The code for data generation (`src/transferring_transferability/DeepSet/data_generator/`) is a modification of the original repository by [manzilzaheer](https://github.com/manzilzaheer/DeepSets), which is associated with the DeepSets paper [1].
 
    * To rerun the size generalization experiment, first delete the corresponding log files in `src/transferring_transferability/DeepSet/log/size_generalization`, then run:
@@ -63,7 +63,7 @@ The transferability experiments, which evaluate the outputs of untrained, random
      ```
    * The implementation of IGN (`src/transferring_transferability/GNN/ign_layers.py`) is taken from the original repository of [HyTruongSon](https://github.com/HyTruongSon/InvariantGraphNetworks-PyTorch), which is an unofficial implementation of the IGN paper [2].
 ### **Size generalization on point clouds**
-* To generate the data, first download the preprocessed ModelNet data [here]() and place them in your data directory. Then, run the following command to generate the data for GW lower bound:
+* To generate the data, first download the preprocessed ModelNet data [here](https://www.dropbox.com/scl/fi/3rx5fy519xvgbb26rt1ga/ModelNet.zip?rlkey=vkny9ajqqhes7jujxpbiqyf7r&st=tq0j3hwk&dl=0). and place them in `[your_data_dir]/anydim_transferability/O_d/`. Then, run the following command to generate the data for GW lower bound:
    ```bash
    python -m transferring_transferability.O_d.data_generator
    ```
